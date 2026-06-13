@@ -40,6 +40,14 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     nonisolated override public func handle(_ event: NSEvent?, client sender: Any?) -> Bool {
         guard let event = event, event.type == .keyDown else { return false }
         if event.modifierFlags.contains(.command) { return false }
+
+        // CapsLock ON = direct input mode (pass through all keys)
+        if event.modifierFlags.contains(.capsLock) {
+            // If we have buffered text, commit it first
+            if !fullText.isEmpty { commitAsIs(client: unwrap(wrap(sender)) as? IMKTextInput) }
+            return false
+        }
+
         guard let chars = event.characters else { return false }
         let isShift = event.modifierFlags.contains(.shift)
         let senderRef = wrap(sender)
@@ -50,6 +58,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     private func handleOnMain(chars: String, keyCode: UInt16, isShift: Bool, client: IMKTextInput?) -> Bool {
         guard let client = client else { return false }
         if converting { return true }
+
         if keyCode == 0x33 {
             if !current.isEmpty { current.removeLast(); updateMarked(client: client); return true }
             else if !phrases.isEmpty { current = phrases.removeLast(); updateMarked(client: client); return true }
