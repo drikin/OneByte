@@ -43,7 +43,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
         // CapsLock ON = direct input mode (pass through all keys)
         if event.modifierFlags.contains(.capsLock) {
-            // If we have buffered text, commit it first
+            NSLog("OneByte: CapsLock ON - pass through, buffer=\(fullText)")
             let senderRef = wrap(sender)
             if !fullText.isEmpty, let client = unwrap(senderRef) as? IMKTextInput { commitAsIs(client: client) }
             return false
