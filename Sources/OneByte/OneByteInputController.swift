@@ -44,7 +44,8 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         // CapsLock ON = direct input mode (pass through all keys)
         if event.modifierFlags.contains(.capsLock) {
             // If we have buffered text, commit it first
-            if !fullText.isEmpty { commitAsIs(client: unwrap(wrap(sender)) as? IMKTextInput) }
+            let senderRef = wrap(sender)
+            if !fullText.isEmpty, let client = unwrap(senderRef) as? IMKTextInput { commitAsIs(client: client) }
             return false
         }
 
