@@ -29,6 +29,8 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         return (phrases + [current]).joined(separator: " ")
     }
 
+    private var capslockOn = false
+
     @objc(deactivateServer:)
     nonisolated override public func deactivateServer(_ sender: Any!) {
         isActive = false
@@ -36,16 +38,23 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         super.deactivateServer(sender)
     }
 
+    // Detect CapsLock state changes
+    nonisolated override public func flagsChanged(_ event: NSEvent) {
+        capslockOn = event.modifierFlags.contains(.capsLock)
+        if capslockOn, Thread.isMainThread, !fullText.isEmpty {
+            // Commit buffered text before passing through
+            // We can't get client here easily, so just mark for next handleEvent
+        }
+    }
+
     @objc(handleEvent:client:)
     nonisolated override public func handle(_ event: NSEvent?, client sender: Any?) -> Bool {
         guard let event = event, event.type == .keyDown else { return false }
         if event.modifierFlags.contains(.command) { return false }
 
-        // CapsLock ON = direct input mode (pass through all keys)
-        if event.modifierFlags.contains(.capsLock) {
-            NSLog("OneByte: CapsLock ON - pass through, buffer=\(fullText)")
-            let senderRef = wrap(sender)
-            if !fullText.isEmpty, let client = unwrap(senderRef) as? IMKTextInput { commitAsIs(client: client) }
+        // CapsLock ON = direct input mode
+        if capslockOn {
+            if !fullText.isEmpty, let client = unwrap(wrap(sender)) as? IMKTextInput { commitAsIs(client: client) }
             return false
         }
 
