@@ -1,8 +1,14 @@
 # OneByte
 
-**macOS IME — Type romaji, get natural Japanese (or English). No conversion keys needed.**
+**For those of us who type in 2-byte languages but think in QWERTY.**
 
-OneByte is a macOS Input Method that replaces traditional Japanese IMEs (Kotoeri, Google Japanese Input). You type romaji freely — including typos, missing letters, and repeated words — and press **Enter** to get clean Japanese. Press **Shift+Enter** to get an English translation instead.
+Every Japanese typist knows the pain: switch to Kotoeri (or Google Japanese Input), type romaji, hit space a dozen times cycling through kanji candidates, realize the segmentation was wrong, backspace, re-segment, repeat. Then you switch back to English mode for that one URL, and forget to switch back. We've all been there.
+
+OneByte throws that 50-year-old IME paradigm out the window.
+
+**Type romaji. Press Enter. Get clean Japanese.** Typos? Missing letters? Wrong segmentation? Doesn't matter. The LLM fixes everything in one shot. No candidate window. No mode switching. No spacebar mashing.
+
+Need English instead? **Shift+Enter.** Done.
 
 Built on Swift + InputMethodKit, backed by a local LLM (vLLM on a DGX Spark cluster via Tailscale).
 
