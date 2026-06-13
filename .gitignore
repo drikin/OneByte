@@ -1,8 +1,10 @@
-.DS_Store
-/.build
-/Packages
-xcuserdata/
+# macOS build artifacts
+*.app
+*.dSYM
+build/
 DerivedData/
-.swiftpm/configuration/registries.json
-.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
-.netrc
+.DS_Store
+*.swp
+*.swo
+*~
+.tmp/

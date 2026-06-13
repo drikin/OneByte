@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Application is background only</key>
+	<true/>
+	<key>CFBundleIdentifier</key>
+	<string>com.drikin.inputmethod.OneByte</string>
+	<key>CFBundleName</key>
+	<string>OneByte</string>
+	<key>CFBundleDisplayName</key>
+	<string>OneByte</string>
+	<key>CFBundleExecutable</key>
+	<string>OneByte</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>InputMethodConnectionName</key>
+	<string>com.drikin.inputmethod.OneByte_Connection</string>
+	<key>InputMethodServerControllerClass</key>
+	<string>OneByteInputController</string>
+	<key>NSPrincipalClass</key>
+	<string>OneByteApplication</string>
+	<key>tsInputMethodCharacterRepertoireKey</key>
+	<array><string>Latn</string><string>Jpan</string></array>
+	<key>tsInputMethodIconFileKey</key>
+	<string>main.tiff</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>100.78.215.127</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<false/>
+			</dict>
+		</dict>
+	</dict>
+</dict>
+</plist>

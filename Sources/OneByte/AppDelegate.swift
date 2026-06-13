@@ -1,8 +1,8 @@
 import Cocoa
 import InputMethodKit
 
-@objc(DriMacApplication)
-class DriMacApplication: NSApplication {
+@objc(OneByteApplication)
+class OneByteApplication: NSApplication {
     private let appDelegate = AppDelegate()
     override init() { super.init(); self.delegate = appDelegate }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -14,6 +14,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let connName = Bundle.main.infoDictionary?["InputMethodConnectionName"] as? String
         server = IMKServer(name: connName, bundleIdentifier: Bundle.main.bundleIdentifier)
-        NSLog("DriMacIME: server initialized")
+        NSLog("OneByte: server initialized")
     }
 }

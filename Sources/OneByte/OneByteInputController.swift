@@ -12,14 +12,17 @@ extension IMKInputController {
     }
 }
 
-@objc(DriMacInputController)
-nonisolated public final class DriMacInputController: IMKInputController, @unchecked Sendable {
+@objc(OneByteInputController)
+nonisolated public final class OneByteInputController: IMKInputController, @unchecked Sendable {
     private var phrases: [String] = []
     private var current: String = ""
     private let inferenceURL = URL(string: "http://100.78.215.127:8000/v1/chat/completions")!
     private let session: URLSession = { let c = URLSessionConfiguration.default; c.timeoutIntervalForRequest = 3.0; c.timeoutIntervalForResource = 5.0; return URLSession(configuration: c) }()
     private var converting = false
     private var conversionTask: Task<Void, Never>?
+    private var isActive = false
+    private let maxPhrases = 20
+    private let maxCurrentLen = 200
 
     private var fullText: String {
         if current.isEmpty { return phrases.joined(separator: " ") }
@@ -28,6 +31,7 @@ nonisolated public final class DriMacInputController: IMKInputController, @unche
 
     @objc(deactivateServer:)
     nonisolated override public func deactivateServer(_ sender: Any!) {
+        isActive = false
         conversionTask?.cancel(); conversionTask = nil; phrases = []; current = ""; converting = false
         super.deactivateServer(sender)
     }
@@ -35,13 +39,10 @@ nonisolated public final class DriMacInputController: IMKInputController, @unche
     @objc(handleEvent:client:)
     nonisolated override public func handle(_ event: NSEvent?, client sender: Any?) -> Bool {
         guard let event = event, event.type == .keyDown else { return false }
-        // Cmd+anything → pass through (let system handle copy/paste/select all)
         if event.modifierFlags.contains(.command) { return false }
         guard let chars = event.characters else { return false }
-
         let isShift = event.modifierFlags.contains(.shift)
         let senderRef = wrap(sender)
-
         if Thread.isMainThread { return handleOnMain(chars: chars, keyCode: event.keyCode, isShift: isShift, client: unwrap(senderRef) as? IMKTextInput) }
         return DispatchQueue.main.sync { self.handleOnMain(chars: chars, keyCode: event.keyCode, isShift: isShift, client: unwrap(senderRef) as? IMKTextInput) }
     }
@@ -49,46 +50,43 @@ nonisolated public final class DriMacInputController: IMKInputController, @unche
     private func handleOnMain(chars: String, keyCode: UInt16, isShift: Bool, client: IMKTextInput?) -> Bool {
         guard let client = client else { return false }
         if converting { return true }
-
         if keyCode == 0x33 {
             if !current.isEmpty { current.removeLast(); updateMarked(client: client); return true }
             else if !phrases.isEmpty { current = phrases.removeLast(); updateMarked(client: client); return true }
             return false
         }
-
         if keyCode == 0x35 { phrases = []; current = ""; let a = NSAttributedString(string: ""); client.setMarkedText(a, selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0)); return true }
-
-        // Space = phrase separator
         if chars == " " {
-            if !current.isEmpty { phrases.append(current); current = ""; updateMarked(client: client); return true }
+            if !current.isEmpty {
+                if phrases.count >= maxPhrases { phrases.removeFirst() }
+                phrases.append(current); current = ""; updateMarked(client: client); return true
+            }
             return false
         }
-
-        // Enter (keyCode 0x24): plain Enter = Japanese, Shift+Enter = English
         if keyCode == 0x24 {
             if !fullText.isEmpty { doConvert(client: client, mode: isShift ? .toEnglish : .toJapanese) }
             return true
         }
-
-        // Tab = commit as-is (raw romaji, no LLM)
         if chars == "\t" {
             if !fullText.isEmpty { commitAsIs(client: client) }
             return true
         }
-
         let accepted = CharacterSet.lowercaseLetters.union(.uppercaseLetters).union(CharacterSet(charactersIn: " ,.!?'-"))
         guard chars.rangeOfCharacter(from: accepted.inverted) == nil else {
             if !fullText.isEmpty { doConvert(client: client, mode: .toJapanese) }
             return false
         }
-
-        current += chars.lowercased(); updateMarked(client: client); return true
+        current += chars.lowercased()
+        if current.count > maxCurrentLen { current = String(current.suffix(maxCurrentLen)) }
+        updateMarked(client: client); return true
     }
 
     private func updateMarked(client: IMKTextInput) {
         let text = fullText; let attr = NSAttributedString(string: text)
         client.setMarkedText(attr, selectionRange: NSRange(location: text.utf16.count, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
     }
+
+    private enum ConvertMode { case toJapanese, toEnglish }
 
     @objc(inputText:client:)
     nonisolated override public func inputText(_ string: String!, client sender: Any!) -> Bool { return false }
@@ -109,17 +107,12 @@ nonisolated public final class DriMacInputController: IMKInputController, @unche
             let result: String
             switch mode {
             case .toJapanese: result = await self.convertRomaji(text)
-            case .toEnglish:
-                let jp = await self.convertRomaji(text)
-                guard !Task.isCancelled else { return }
-                result = await self.translateToEnglish(jp)
+            case .toEnglish: let jp = await self.convertRomaji(text); guard !Task.isCancelled else { return }; result = await self.translateToEnglish(jp)
             }
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, isActive else { return }
             await MainActor.run { self.converting = false; client.insertText(result, replacementRange: NSRange(location: NSNotFound, length: NSNotFound)) }
         }
     }
-
-    private enum ConvertMode { case toJapanese, toEnglish }
 
     private func convertRomaji(_ romaji: String) async -> String {
         let prompt = "Convert the following romaji text to natural Japanese. Fix any typos, missing letters, repeated words, and make it natural. Output ONLY the converted Japanese text. No explanation. No quotes."
@@ -144,7 +137,7 @@ nonisolated public final class DriMacInputController: IMKInputController, @unche
                let msg = first["message"] as? [String: Any], let content = msg["content"] as? String {
                 return content.trimmingCharacters(in: .whitespacesAndNewlines)
             }
-        } catch { NSLog("DriMacIME error: \(error)") }
+        } catch { NSLog("OneByte error: \(error)") }
         return fallback
     }
 }
