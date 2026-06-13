@@ -38,18 +38,17 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         super.deactivateServer(sender)
     }
 
-    // Detect CapsLock state changes
-    nonisolated override public func flagsChanged(_ event: NSEvent) {
-        capslockOn = event.modifierFlags.contains(.capsLock)
-        if capslockOn, Thread.isMainThread, !fullText.isEmpty {
-            // Commit buffered text before passing through
-            // We can't get client here easily, so just mark for next handleEvent
-        }
-    }
-
     @objc(handleEvent:client:)
     nonisolated override public func handle(_ event: NSEvent?, client sender: Any?) -> Bool {
-        guard let event = event, event.type == .keyDown else { return false }
+        guard let event = event else { return false }
+
+        // Catch CapsLock toggle via flagsChanged events
+        if event.type == .flagsChanged {
+            capslockOn = event.modifierFlags.contains(.capsLock)
+            return false  // Don't consume the event
+        }
+
+        guard event.type == .keyDown else { return false }
         if event.modifierFlags.contains(.command) { return false }
 
         // CapsLock ON = direct input mode
