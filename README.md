@@ -4,6 +4,20 @@
 
 日本語をローマ字入力するすべての人が知っているあの苦労——KotoeriやGoogle日本語入力に切り替えて、ローマ字を打ち、スペースを十数回叩いて変換候補を巡回し、文節区切りが間違ってることに気づいてBackspace、区切り直してまた変換、そしてURLをコピーしようとして英数モードに切り替えるのを忘れて大文字が連打される… もう十分でしょう。
 
+## きっかけ
+
+2026年6月9日、[瀬戸弘司さん (@eguri89)](https://x.com/eguri89) がこんなポストをしました：
+
+> *あー、これやばいっすね。タイピング速度が爆速になります。従来のIMEではなく、AIを使ってローマ字を日本語に変換させる方法です。*
+>
+> *実際に試してみると思考がそのまま指から流れ出るような、まるでタイピングゲームの「寿司打」をプレイするときのような疾走感があり、新感覚過ぎて癖になります。*
+
+この投稿は瞬く間に130万ビュー。**「変換キーを叩かない日本語入力」** という発想に多くの人が衝撃を受けました。
+
+OneByteはその発想を、実際に毎日使えるIMEとして製品化したものです。
+
+## コンセプト
+
 OneByteは50年前から変わらないIMEのパラダイムをぶち壊します。
 
 **ローマ字を打つ。Enterを押す。日本語が出る。**
@@ -49,17 +63,6 @@ This is a test.
 
 ## インストール
 
-### クイックインストール（gist経由）
-```bash
-bash <(curl -sL https://gist.githubusercontent.com/drikin/5136e194cf6e74695193317363e409af/raw/build-and-install.sh)
-sudo cp -r /tmp/OneByte_Build/OneByte.app /Library/Input\ Methods/
-sudo chmod -R 755 /Library/Input\ Methods/OneByte.app
-sudo xattr -cr "/Library/Input Methods/OneByte.app"
-```
-
-その後、**システム設定 > キーボード > 入力ソース** で「OneByte」を追加。
-
-### ソースからビルド
 ```bash
 git clone https://github.com/drikin/OneByte.git
 cd OneByte
@@ -68,6 +71,10 @@ sudo cp -r /tmp/OneByte_Build/OneByte.app /Library/Input\ Methods/
 sudo chmod -R 755 /Library/Input\ Methods/OneByte.app
 sudo xattr -cr "/Library/Input Methods/OneByte.app"
 ```
+
+その後、**システム設定 > キーボード > 入力ソース** で「OneByte」を追加してください。
+
+**ログアウト／再起動が必要な場合があります。**
 
 ## アーキテクチャ
 
@@ -83,6 +90,8 @@ handleEvent → handleOnMain → [キー蓄積]
 - **左右Cmdの判別**: 採用せず。`NSEvent.ModifierFlags.rightCommand` は実際には存在しないAPIだった。代わりに `Shift+Enter` で英訳。
 - **文節配列** (`phrases:[String] + current:String`): Spaceで文節を区切り、LLMには連結した全文を渡すことで文脈を考慮した変換を実現。
 - **端末上のフォールバック**: 未実装。LLMに繋がらない場合はローマ字をそのまま確定する。Mozcベースのローカル変換エンジンは将来の検討課題。
+- **isActiveフラグ**: `deactivateServer` 時にフラグを落とし、ゾンビTaskによるclient参照を防止。
+- **phrases上限**: 20文節で打ち切り、古いものから削除。
 
 ## LLMエンドポイントの設定
 
