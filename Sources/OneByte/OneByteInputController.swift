@@ -33,8 +33,8 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
     // Check actual CapsLock state via IOKit at every keyDown
     private func updateCapsLockState() -> Bool {
-        let flags = CGEventSourceFlagsState(CGEventSourceStateID.privateState)
-        return (flags & UInt64(CGEventFlags.maskAlphaShift.rawValue)) != 0
+        let flags = CGEventSource.flagsState(.privateState)
+        return flags.contains(.maskAlphaShift)
     }
 
     @objc(deactivateServer:)
