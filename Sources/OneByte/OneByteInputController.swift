@@ -18,9 +18,9 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     private var current: String = ""
     private let inferenceURL = URL(string: "http://100.78.215.127:8000/v1/chat/completions")!
     private let session: URLSession = { let c = URLSessionConfiguration.default; c.timeoutIntervalForRequest = 3.0; c.timeoutIntervalForResource = 5.0; return URLSession(configuration: c) }()
+    // converting is only used to prevent double-trigger of conversion — NOT to block key input
     private var converting = false
     private var conversionTask: Task<Void, Never>?
-    private var isActive = false
     private let maxPhrases = 20
     private let maxCurrentLen = 200
 
@@ -30,12 +30,6 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     }
 
     private var capslockOn = false
-
-    // Check actual CapsLock state via IOKit at every keyDown
-    private func updateCapsLockState() -> Bool {
-        let flags = CGEventSource.flagsState(.privateState)
-        return flags.contains(.maskAlphaShift)
-    }
 
     @objc(deactivateServer:)
     nonisolated override public func deactivateServer(_ sender: Any!) {
@@ -48,10 +42,8 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         guard let event = event, event.type == .keyDown else { return false }
         if event.modifierFlags.contains(.command) { return false }
 
-        // Update CapsLock state at every keyDown from hardware
-        capslockOn = updateCapsLockState()
-
-        // CapsLock ON = direct input mode
+        // CapsLock: check via NSEvent modifierFlags (fast, no syscall)
+        capslockOn = event.modifierFlags.contains(.capsLock)
         if capslockOn {
             if !fullText.isEmpty, let client = unwrap(wrap(sender)) as? IMKTextInput { commitAsIs(client: client) }
             return false
@@ -59,14 +51,21 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
         guard let chars = event.characters else { return false }
         let isShift = event.modifierFlags.contains(.shift)
-        let senderRef = wrap(sender)
-        if Thread.isMainThread { return handleOnMain(chars: chars, keyCode: event.keyCode, isShift: isShift, client: unwrap(senderRef) as? IMKTextInput) }
-        return DispatchQueue.main.sync { self.handleOnMain(chars: chars, keyCode: event.keyCode, isShift: isShift, client: unwrap(senderRef) as? IMKTextInput) }
+
+        if Thread.isMainThread {
+            return handleOnMain(chars: chars, keyCode: event.keyCode, isShift: isShift, client: unwrap(wrap(sender)) as? IMKTextInput)
+        }
+        // main.sync is needed here because IMK requires handleEvent to return a value synchronously
+        // but the work inside is extremely fast (just buffer manipulation), so it won't block.
+        return DispatchQueue.main.sync {
+            self.handleOnMain(chars: chars, keyCode: event.keyCode, isShift: isShift, client: unwrap(wrap(sender)) as? IMKTextInput)
+        }
     }
 
     private func handleOnMain(chars: String, keyCode: UInt16, isShift: Bool, client: IMKTextInput?) -> Bool {
         guard let client = client else { return false }
-        if converting { return true }
+        // Do NOT block on converting — just let the user keep typing.
+        // The buffer will accumulate and be available for the next conversion.
 
         if keyCode == 0x33 {
             if !current.isEmpty { current.removeLast(); updateMarked(client: client); return true }
@@ -117,7 +116,9 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     }
 
     private func doConvert(client: IMKTextInput, mode: ConvertMode) {
-        conversionTask?.cancel(); conversionTask = nil
+        // Don't cancel previous conversion — let it finish in background
+        // But do prevent double-trigger of the same conversion
+        if converting { return }
         let text = fullText; phrases = []; current = ""; converting = true
         client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
         conversionTask = Task { [weak self] in
