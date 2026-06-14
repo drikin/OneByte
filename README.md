@@ -57,7 +57,7 @@ This is a test.
 | **Backspace** | 1文字削除 / 前の文節に戻る | 編集 |
 | **Escape** | 全文クリア | 編集 |
 | **Cmd+任意** | アプリへ素通り（コピペ・全選択等） | パススルー |
-| **Ctrl+J** | 直接入力モードON/OFFトグル | モード切替 |
+|| **Ctrl+J** | 直接入力モードON/OFFトグル（英字を直接打ちたいとき） | モード切替 |
 
 ## 必要条件
 
@@ -110,19 +110,31 @@ handleEvent → handleOnMain → [キー蓄積]
 
 ## LLMエンドポイントの設定
 
-1. **ターミナルで設定（永続化）**:
-   ```bash
-   defaults write com.drikin.inputmethod.OneByte OneByteEndpoint "http://YOUR_SERVER:PORT/v1/chat/completions"
-   ```
+OneByteはデフォルトで OpenAI API（`gpt-4o-mini`）を使用します。APIキーが設定されていない場合、リクエストは認証なしで送信されます。
 
-2. **確認**:
-   ```bash
-   defaults read com.drikin.inputmethod.OneByte OneByteEndpoint
-   ```
+**ターミナルで設定（永続化）:**
+
+| キー | 説明 | デフォルト |
+|---|---|---|
+| `OneByteEndpoint` | LLM APIエンドポイントURL | `https://api.openai.com/v1/chat/completions` |
+| `OneByteAPIKey` | Bearer認証トークン（空なら未設定） | なし |
+| `OneByteModel` | モデル名 | `gpt-4o-mini` |
+
+```bash
+# 例: OpenAI
+defaults write com.drikin.inputmethod.OneByte OneByteEndpoint "https://api.openai.com/v1/chat/completions"
+defaults write com.drikin.inputmethod.OneByte OneByteAPIKey "sk-xxxxx"
+defaults write com.drikin.inputmethod.OneByte OneByteModel "gpt-4o-mini"
+
+# 例: ローカルvLLM
+defaults write com.drikin.inputmethod.OneByte OneByteEndpoint "http://localhost:8000/v1/chat/completions"
+defaults write com.drikin.inputmethod.OneByte OneByteModel "qwen"
+
+# 確認
+defaults read com.drikin.inputmethod.OneByte
+```
 
 変更後は **ログアウト／ログイン** または OneByte プロセスを再起動してください。
-
-デフォルト: `http://100.78.215.127:8000/v1/chat/completions`（開発環境のvLLM）
 
 ## ライセンス
 
