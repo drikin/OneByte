@@ -16,8 +16,13 @@ extension IMKInputController {
 nonisolated public final class OneByteInputController: IMKInputController, @unchecked Sendable {
     private var phrases: [String] = []
     private var current: String = ""
-    private let inferenceURL = URL(string: "http://100.78.215.127:8000/v1/chat/completions")!
     private let session: URLSession = { let c = URLSessionConfiguration.default; c.timeoutIntervalForRequest = 3.0; c.timeoutIntervalForResource = 5.0; return URLSession(configuration: c) }()
+    private let inferenceURL: URL = {
+        // Try UserDefaults first, fall back to hardcoded
+        if let saved = UserDefaults.standard.string(forKey: "OneByteEndpoint"),
+           let url = URL(string: saved) { return url }
+        return URL(string: "http://100.78.215.127:8000/v1/chat/completions")!
+    }()
     private var converting = false
     private var conversionTask: Task<Void, Never>?
     private let maxPhrases = 20

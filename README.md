@@ -110,13 +110,19 @@ handleEvent → handleOnMain → [キー蓄積]
 
 ## LLMエンドポイントの設定
 
-現在は `OneByteInputController.swift` にハードコードされています：
+1. **ターミナルで設定（永続化）**:
+   ```bash
+   defaults write com.drikin.inputmethod.OneByte OneByteEndpoint "http://YOUR_SERVER:PORT/v1/chat/completions"
+   ```
 
-```swift
-private let inferenceURL = URL(string: "http://YOUR_SERVER:PORT/v1/chat/completions")!
-```
+2. **確認**:
+   ```bash
+   defaults read com.drikin.inputmethod.OneByte OneByteEndpoint
+   ```
 
-将来的には設定ファイルまたは `UserDefaults` で変更可能にする予定です。
+変更後は **ログアウト／ログイン** または OneByte プロセスを再起動してください。
+
+デフォルト: `http://100.78.215.127:8000/v1/chat/completions`（開発環境のvLLM）
 
 ## ライセンス
 
