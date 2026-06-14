@@ -46,14 +46,13 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         // Ctrl single-press toggle via flagsChanged
         if event.type == .flagsChanged {
             let ctrlDown = event.modifierFlags.contains(.control)
+            NSLog("OneByte: flagsChanged type=flagsChanged ctrl=\(ctrlDown) wasPressed=\(ctrlWasPressed) keyCode=\(event.keyCode)")
             if ctrlDown && !ctrlWasPressed {
-                // Ctrl pressed — mark it, wait for release
                 ctrlWasPressed = true
             } else if !ctrlDown && ctrlWasPressed {
-                // Ctrl released — toggle direct mode
                 ctrlWasPressed = false
                 directMode.toggle()
-                // If switching to direct mode, commit pending buffer
+                NSLog("OneByte: toggled directMode=\(directMode)")
                 if directMode, let sender = sender as? IMKTextInput {
                     if !fullText.isEmpty { commitAsIs(client: sender) }
                     if fullText.isEmpty {
@@ -61,7 +60,6 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
                     }
                 }
             }
-            // Don't consume — let other Ctrl+key combos work
             if ctrlDown || ctrlWasPressed { return false }
             return false
         }
