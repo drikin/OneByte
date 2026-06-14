@@ -27,7 +27,7 @@
 	<key>NSPrincipalClass</key>
 	<string>OneByteApplication</string>
 	<key>tsInputMethodCharacterRepertoireKey</key>
-	<array><string>Jpan</string><string>Latn</string></array>
+	<array><string>Jpan</string></array>
 	<key>tsInputMethodIconFileKey</key>
 	<string>main.tiff</string>
 	<key>NSAppTransportSecurity</key>
