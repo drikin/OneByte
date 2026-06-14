@@ -23,11 +23,6 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     private let maxPhrases = 20
     private let maxCurrentLen = 200
 
-    // Direct input mode toggle (Ctrl single-press)
-    private var directMode = false
-    // Track Ctrl key state for single-press detection
-    private var ctrlWasPressed = false
-
     // Toggle direct mode via Ctrl+J
     private var directMode = false
 
