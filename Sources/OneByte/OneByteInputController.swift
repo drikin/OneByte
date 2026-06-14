@@ -31,6 +31,14 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
     private var capslockOn = false
 
+    // Check actual CapsLock state via IOKit at every keyDown
+    private func updateCapsLockState() -> Bool {
+        // NSEvent.modifierFlags is not reliable for CapsLock from IMK
+        // Use CGEventSourceFlagsState which reads the actual hardware state
+        let flags = CGEventSourceFlagsState(kCGEventSourceStatePrivate)
+        return (flags & UInt64(kCGEventFlagMaskAlphaShift)) != 0
+    }
+
     @objc(deactivateServer:)
     nonisolated override public func deactivateServer(_ sender: Any!) {
         conversionTask?.cancel(); conversionTask = nil; phrases = []; current = ""; converting = false
@@ -39,31 +47,11 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
     @objc(handleEvent:client:)
     nonisolated override public func handle(_ event: NSEvent?, client sender: Any?) -> Bool {
-        guard let event = event else { return false }
-
-        // Track CapsLock state via flagsChanged events — immediate mode switch
-        if event.type == .flagsChanged {
-            let newState = event.modifierFlags.contains(.capsLock)
-            if newState != capslockOn {
-                capslockOn = newState
-                if capslockOn, let sender = sender {
-                    // Switch to direct input: commit any pending buffer
-                    // Try to get the client from the sender
-                    if let client = sender as? IMKTextInput, !fullText.isEmpty {
-                        // Need to be on main thread for IMK calls
-                        if Thread.isMainThread {
-                            commitAsIs(client: client)
-                        } else {
-                            DispatchQueue.main.sync { self.commitAsIs(client: client) }
-                        }
-                    }
-                }
-            }
-            return false  // Don't consume — let system handle CapsLock normally
-        }
-
-        guard event.type == .keyDown else { return false }
+        guard let event = event, event.type == .keyDown else { return false }
         if event.modifierFlags.contains(.command) { return false }
+
+        // Update CapsLock state at every keyDown from hardware
+        capslockOn = updateCapsLockState()
 
         // CapsLock ON = direct input mode
         if capslockOn {
