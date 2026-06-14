@@ -41,6 +41,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     @objc(handleEvent:client:)
     nonisolated override public func handle(_ event: NSEvent?, client sender: Any?) -> Bool {
         guard let event = event else { return false }
+        NSLog("OneByte: handleEvent type=\(event.type.rawValue) keyCode=\(event.keyCode) caps=\(capslockOn)")
 
         // Catch CapsLock toggle via flagsChanged events
         if event.type == .flagsChanged {
