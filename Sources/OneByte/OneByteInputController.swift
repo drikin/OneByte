@@ -18,18 +18,20 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     private var current: String = ""
     private let inferenceURL = URL(string: "http://100.78.215.127:8000/v1/chat/completions")!
     private let session: URLSession = { let c = URLSessionConfiguration.default; c.timeoutIntervalForRequest = 3.0; c.timeoutIntervalForResource = 5.0; return URLSession(configuration: c) }()
-    // converting is only used to prevent double-trigger of conversion — NOT to block key input
     private var converting = false
     private var conversionTask: Task<Void, Never>?
     private let maxPhrases = 20
     private let maxCurrentLen = 200
 
+    // Direct input mode toggle (Ctrl single-press)
+    private var directMode = false
+    // Track Ctrl key state for single-press detection
+    private var ctrlWasPressed = false
+
     private var fullText: String {
         if current.isEmpty { return phrases.joined(separator: " ") }
         return (phrases + [current]).joined(separator: " ")
     }
-
-    private var capslockOn = false
 
     @objc(deactivateServer:)
     nonisolated override public func deactivateServer(_ sender: Any!) {
@@ -41,34 +43,34 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     nonisolated override public func handle(_ event: NSEvent?, client sender: Any?) -> Bool {
         guard let event = event else { return false }
 
-        // Immediate CapsLock toggle via flagsChanged
+        // Ctrl single-press toggle via flagsChanged
         if event.type == .flagsChanged {
-            let newCaps = event.modifierFlags.contains(.capsLock)
-            if newCaps != capslockOn {
-                capslockOn = newCaps
-                if capslockOn, let sender = sender as? IMKTextInput {
-                    // Commit any pending buffer immediately
-                    let client = sender
-                    if !fullText.isEmpty { commitAsIs(client: client) }
-                    // Also clear marked text if buffer was empty
+            let ctrlDown = event.modifierFlags.contains(.control)
+            if ctrlDown && !ctrlWasPressed {
+                // Ctrl pressed — mark it, wait for release
+                ctrlWasPressed = true
+            } else if !ctrlDown && ctrlWasPressed {
+                // Ctrl released — toggle direct mode
+                ctrlWasPressed = false
+                directMode.toggle()
+                // If switching to direct mode, commit pending buffer
+                if directMode, let sender = sender as? IMKTextInput {
+                    if !fullText.isEmpty { commitAsIs(client: sender) }
                     if fullText.isEmpty {
-                        client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+                        sender.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
                     }
-                } else if !capslockOn {
-                    // Switching back to OneByte mode — nothing special needed
                 }
             }
-            return false  // Don't consume — let system handle CapsLock normally
+            // Don't consume — let other Ctrl+key combos work
+            if ctrlDown || ctrlWasPressed { return false }
+            return false
         }
 
         guard event.type == .keyDown else { return false }
         if event.modifierFlags.contains(.command) { return false }
 
-        // CapsLock ON = direct input mode
-        if capslockOn {
-            if !fullText.isEmpty, let client = unwrap(wrap(sender)) as? IMKTextInput { commitAsIs(client: client) }
-            return false
-        }
+        // Direct mode = pass through all keys
+        if directMode { return false }
 
         guard let chars = event.characters else { return false }
         let isShift = event.modifierFlags.contains(.shift)
@@ -76,8 +78,6 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         if Thread.isMainThread {
             return handleOnMain(chars: chars, keyCode: event.keyCode, isShift: isShift, client: unwrap(wrap(sender)) as? IMKTextInput)
         }
-        // main.sync is needed here because IMK requires handleEvent to return a value synchronously
-        // but the work inside is extremely fast (just buffer manipulation), so it won't block.
         return DispatchQueue.main.sync {
             self.handleOnMain(chars: chars, keyCode: event.keyCode, isShift: isShift, client: unwrap(wrap(sender)) as? IMKTextInput)
         }
@@ -85,8 +85,6 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
     private func handleOnMain(chars: String, keyCode: UInt16, isShift: Bool, client: IMKTextInput?) -> Bool {
         guard let client = client else { return false }
-        // Do NOT block on converting — just let the user keep typing.
-        // The buffer will accumulate and be available for the next conversion.
 
         if keyCode == 0x33 {
             if !current.isEmpty { current.removeLast(); updateMarked(client: client); return true }
@@ -137,8 +135,6 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     }
 
     private func doConvert(client: IMKTextInput, mode: ConvertMode) {
-        // Don't cancel previous conversion — let it finish in background
-        // But do prevent double-trigger of the same conversion
         if converting { return }
         let text = fullText; phrases = []; current = ""; converting = true
         client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
