@@ -66,6 +66,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
     private func handleOnMain(chars: String, keyCode: UInt16, isShift: Bool, client: IMKTextInput?) -> Bool {
         guard let client = client else { return false }
+        NSLog("OneByte: handleOnMain chars='\(chars)' keyCode=\(keyCode) isShift=\(isShift) buf='\(fullText)'")
         if converting { return true }
 
         if keyCode == 0x33 {
