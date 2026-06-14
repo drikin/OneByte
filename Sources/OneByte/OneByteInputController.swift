@@ -33,7 +33,6 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
     @objc(deactivateServer:)
     nonisolated override public func deactivateServer(_ sender: Any!) {
-        isActive = false
         conversionTask?.cancel(); conversionTask = nil; phrases = []; current = ""; converting = false
         super.deactivateServer(sender)
     }
@@ -41,7 +40,6 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     @objc(handleEvent:client:)
     nonisolated override public func handle(_ event: NSEvent?, client sender: Any?) -> Bool {
         guard let event = event else { return false }
-        NSLog("OneByte: handleEvent type=\(event.type.rawValue) keyCode=\(event.keyCode) caps=\(capslockOn)")
 
         // Catch CapsLock toggle via flagsChanged events
         if event.type == .flagsChanged {
@@ -67,7 +65,6 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
     private func handleOnMain(chars: String, keyCode: UInt16, isShift: Bool, client: IMKTextInput?) -> Bool {
         guard let client = client else { return false }
-        NSLog("OneByte: handleOnMain chars='\(chars)' keyCode=\(keyCode) isShift=\(isShift) buf='\(fullText)'")
         if converting { return true }
 
         if keyCode == 0x33 {
@@ -129,7 +126,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
             case .toJapanese: result = await self.convertRomaji(text)
             case .toEnglish: let jp = await self.convertRomaji(text); guard !Task.isCancelled else { return }; result = await self.translateToEnglish(jp)
             }
-            guard !Task.isCancelled, isActive else { return }
+            guard !Task.isCancelled else { return }
             await MainActor.run { self.converting = false; client.insertText(result, replacementRange: NSRange(location: NSNotFound, length: NSNotFound)) }
         }
     }
