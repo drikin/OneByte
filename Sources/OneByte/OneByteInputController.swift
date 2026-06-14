@@ -41,9 +41,24 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     nonisolated override public func handle(_ event: NSEvent?, client sender: Any?) -> Bool {
         guard let event = event else { return false }
 
-        // Track CapsLock state via flagsChanged events
+        // Track CapsLock state via flagsChanged events — immediate mode switch
         if event.type == .flagsChanged {
-            capslockOn = event.modifierFlags.contains(.capsLock)
+            let newState = event.modifierFlags.contains(.capsLock)
+            if newState != capslockOn {
+                capslockOn = newState
+                if capslockOn, let sender = sender {
+                    // Switch to direct input: commit any pending buffer
+                    // Try to get the client from the sender
+                    if let client = sender as? IMKTextInput, !fullText.isEmpty {
+                        // Need to be on main thread for IMK calls
+                        if Thread.isMainThread {
+                            commitAsIs(client: client)
+                        } else {
+                            DispatchQueue.main.sync { self.commitAsIs(client: client) }
+                        }
+                    }
+                }
+            }
             return false  // Don't consume — let system handle CapsLock normally
         }
 
