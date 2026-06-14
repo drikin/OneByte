@@ -39,11 +39,32 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
     @objc(handleEvent:client:)
     nonisolated override public func handle(_ event: NSEvent?, client sender: Any?) -> Bool {
-        guard let event = event, event.type == .keyDown else { return false }
+        guard let event = event else { return false }
+
+        // Immediate CapsLock toggle via flagsChanged
+        if event.type == .flagsChanged {
+            let newCaps = event.modifierFlags.contains(.capsLock)
+            if newCaps != capslockOn {
+                capslockOn = newCaps
+                if capslockOn, let sender = sender as? IMKTextInput {
+                    // Commit any pending buffer immediately
+                    let client = sender
+                    if !fullText.isEmpty { commitAsIs(client: client) }
+                    // Also clear marked text if buffer was empty
+                    if fullText.isEmpty {
+                        client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+                    }
+                } else if !capslockOn {
+                    // Switching back to OneByte mode — nothing special needed
+                }
+            }
+            return false  // Don't consume — let system handle CapsLock normally
+        }
+
+        guard event.type == .keyDown else { return false }
         if event.modifierFlags.contains(.command) { return false }
 
-        // CapsLock: check via NSEvent modifierFlags (fast, no syscall)
-        capslockOn = event.modifierFlags.contains(.capsLock)
+        // CapsLock ON = direct input mode
         if capslockOn {
             if !fullText.isEmpty, let client = unwrap(wrap(sender)) as? IMKTextInput { commitAsIs(client: client) }
             return false
