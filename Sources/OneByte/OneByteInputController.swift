@@ -28,6 +28,9 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     // Track Ctrl key state for single-press detection
     private var ctrlWasPressed = false
 
+    // Toggle direct mode via Ctrl+J
+    private var directMode = false
+
     private var fullText: String {
         if current.isEmpty { return phrases.joined(separator: " ") }
         return (phrases + [current]).joined(separator: " ")
@@ -41,30 +44,18 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
     @objc(handleEvent:client:)
     nonisolated override public func handle(_ event: NSEvent?, client sender: Any?) -> Bool {
-        guard let event = event else { return false }
+        guard let event = event, event.type == .keyDown else { return false }
 
-        // Ctrl single-press toggle via flagsChanged
-        if event.type == .flagsChanged {
-            let ctrlDown = event.modifierFlags.contains(.control)
-            NSLog("OneByte: flagsChanged type=flagsChanged ctrl=\(ctrlDown) wasPressed=\(ctrlWasPressed) keyCode=\(event.keyCode)")
-            if ctrlDown && !ctrlWasPressed {
-                ctrlWasPressed = true
-            } else if !ctrlDown && ctrlWasPressed {
-                ctrlWasPressed = false
-                directMode.toggle()
-                NSLog("OneByte: toggled directMode=\(directMode)")
-                if directMode, let sender = sender as? IMKTextInput {
-                    if !fullText.isEmpty { commitAsIs(client: sender) }
-                    if fullText.isEmpty {
-                        sender.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
-                    }
-                }
+        // Ctrl+J toggles direct mode
+        if event.modifierFlags.contains(.control) && event.keyCode == 0x26 {
+            directMode.toggle()
+            if directMode, let client = unwrap(wrap(sender)) as? IMKTextInput {
+                if !fullText.isEmpty { commitAsIs(client: client) }
+                if fullText.isEmpty { client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0)) }
             }
-            if ctrlDown || ctrlWasPressed { return false }
-            return false
+            return true
         }
 
-        guard event.type == .keyDown else { return false }
         if event.modifierFlags.contains(.command) { return false }
 
         // Direct mode = pass through all keys
