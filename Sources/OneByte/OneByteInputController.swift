@@ -39,20 +39,15 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
     @objc(handleEvent:client:)
     nonisolated override public func handle(_ event: NSEvent?, client sender: Any?) -> Bool {
-        guard let event = event, event.type == .keyDown else { return false }
+        guard let event = event else { return false }
 
-        // Check CapsLock state at every keyDown via IOKit (more reliable)
-        #if false
-        // This doesn't work — flagsChanged doesn't reach handleEvent
+        // Track CapsLock state via flagsChanged events
         if event.type == .flagsChanged {
             capslockOn = event.modifierFlags.contains(.capsLock)
-            return false
+            return false  // Don't consume — let system handle CapsLock normally
         }
-        #endif
 
-        // Directly check CapsLock via event modifier flags
-        capslockOn = event.modifierFlags.contains(.capsLock)
-
+        guard event.type == .keyDown else { return false }
         if event.modifierFlags.contains(.command) { return false }
 
         // CapsLock ON = direct input mode
