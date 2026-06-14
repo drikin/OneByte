@@ -18,17 +18,23 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     private var current: String = ""
     private let session: URLSession = { let c = URLSessionConfiguration.default; c.timeoutIntervalForRequest = 3.0; c.timeoutIntervalForResource = 5.0; return URLSession(configuration: c) }()
     private let inferenceURL: URL = {
-        // Try UserDefaults first, fall back to hardcoded
+        // UserDefaults keys: OneByteEndpoint (URL), OneByteAPIKey, OneByteModel
         if let saved = UserDefaults.standard.string(forKey: "OneByteEndpoint"),
            let url = URL(string: saved) { return url }
-        return URL(string: "http://100.78.215.127:8000/v1/chat/completions")!
+        return URL(string: "https://api.openai.com/v1/chat/completions")!
     }()
+    private var apiKey: String {
+        UserDefaults.standard.string(forKey: "OneByteAPIKey") ?? ""
+    }
+    private var modelName: String {
+        UserDefaults.standard.string(forKey: "OneByteModel") ?? "gpt-4o-mini"
+    }
     private var converting = false
     private var conversionTask: Task<Void, Never>?
     private let maxPhrases = 20
     private let maxCurrentLen = 200
 
-    // Toggle direct mode via Ctrl+J
+    // Ctrl+J toggles direct/passthrough mode
     private var directMode = false
 
     private var fullText: String {
@@ -46,19 +52,20 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     nonisolated override public func handle(_ event: NSEvent?, client sender: Any?) -> Bool {
         guard let event = event, event.type == .keyDown else { return false }
 
-        // Ctrl+J toggles direct mode
+        // Ctrl+J toggles direct mode (independent of CapsLock — removed)
         if event.modifierFlags.contains(.control) && event.keyCode == 0x26 {
             directMode.toggle()
             if directMode, let client = unwrap(wrap(sender)) as? IMKTextInput {
                 if !fullText.isEmpty { commitAsIs(client: client) }
-                if fullText.isEmpty { client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0)) }
+                // Clear marked text if buffer was empty
+                client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
             }
             return true
         }
 
         if event.modifierFlags.contains(.command) { return false }
 
-        // Direct mode = pass through all keys
+        // Direct mode = pass through all keys (like CapsLock did)
         if directMode { return false }
 
         guard let chars = event.characters else { return false }
@@ -141,18 +148,20 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
     private func convertRomaji(_ romaji: String) async -> String {
         let prompt = "Convert the following romaji text to natural Japanese. Fix any typos, missing letters, repeated words, and make it natural. Output ONLY the converted Japanese text. No explanation. No quotes."
-        let body: [String: Any] = ["model": "spark-local", "messages": [["role": "system", "content": prompt], ["role": "user", "content": romaji]], "max_tokens": 60, "temperature": 0.1]
+        let body: [String: Any] = ["model": modelName, "messages": [["role": "system", "content": prompt], ["role": "user", "content": romaji]], "max_tokens": 60, "temperature": 0.1]
         return await callLLM(body: body, fallback: romaji)
     }
 
     private func translateToEnglish(_ japanese: String) async -> String {
         let prompt = "Translate the following Japanese text to natural English. Output ONLY the English translation. No explanation. No quotes."
-        let body: [String: Any] = ["model": "spark-local", "messages": [["role": "system", "content": prompt], ["role": "user", "content": japanese]], "max_tokens": 60, "temperature": 0.1]
+        let body: [String: Any] = ["model": modelName, "messages": [["role": "system", "content": prompt], ["role": "user", "content": japanese]], "max_tokens": 60, "temperature": 0.1]
         return await callLLM(body: body, fallback: japanese)
     }
 
     private func callLLM(body: [String: Any], fallback: String) async -> String {
-        var req = URLRequest(url: inferenceURL); req.httpMethod = "POST"; req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var req = URLRequest(url: inferenceURL); req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if !apiKey.isEmpty { req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization") }
         do {
             req.httpBody = try JSONSerialization.data(withJSONObject: body)
             let (data, resp) = try await session.data(for: req)
