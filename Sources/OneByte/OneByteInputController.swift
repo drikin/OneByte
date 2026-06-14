@@ -43,6 +43,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
         // Catch CapsLock toggle via flagsChanged events
         if event.type == .flagsChanged {
+            NSLog("OneByte: flagsChanged capsLock=\(event.modifierFlags.contains(.capsLock))")
             capslockOn = event.modifierFlags.contains(.capsLock)
             return false  // Don't consume the event
         }
