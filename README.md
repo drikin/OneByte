@@ -116,9 +116,9 @@ OneByteはデフォルトで OpenAI API（`gpt-4o-mini`）を使用します。A
 
 | キー | 説明 | デフォルト |
 |---|---|---|
-| `OneByteEndpoint` | LLM APIエンドポイントURL | `https://api.openai.com/v1/chat/completions` |
-| `OneByteAPIKey` | Bearer認証トークン（空なら未設定） | なし |
-| `OneByteModel` | モデル名 | `gpt-4o-mini` |
+| `OneByteEndpoint` | LLM APIエンドポイントURL | `http://100.78.215.127:8000/v1/chat/completions` |
+|| `OneByteAPIKey` | Bearer認証トークン（空なら未設定） | なし |
+|| `OneByteModel` | モデル名 | `spark-local` |
 
 ```bash
 # 例: OpenAI

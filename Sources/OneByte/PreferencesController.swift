@@ -23,9 +23,9 @@ class PreferencesController: NSWindowController {
 
 // MARK: - SwiftUI Preferences Panel
 struct PreferencesPanel: View {
-    @AppStorage("OneByteEndpoint") var endpoint = "https://api.openai.com/v1/chat/completions"
+    @AppStorage("OneByteEndpoint") var endpoint = "http://100.78.215.127:8000/v1/chat/completions"
     @AppStorage("OneByteAPIKey") var apiKey = ""
-    @AppStorage("OneByteModel") var model = "gpt-4o-mini"
+    @AppStorage("OneByteModel") var model = "spark-local"
 
     @State private var statusText = ""
     @State private var statusColor: Color = .gray
@@ -33,8 +33,9 @@ struct PreferencesPanel: View {
 
     // Presets
     private let presets: [(String, String, String, String)] = [
+        ("Spark2 vLLM", "http://100.78.215.127:8000/v1/chat/completions", "", "spark-local"),
+        ("DriMac Gemma4", "http://100.100.36.4:8081/v1/chat/completions", "", "gemma4"),
         ("OpenAI GPT-4o-mini", "https://api.openai.com/v1/chat/completions", "", "gpt-4o-mini"),
-        ("Spark2 vLLM (ローカル)", "http://100.78.215.127:8000/v1/chat/completions", "", "spark-local"),
         ("Ollama ローカル", "http://localhost:11434/v1/chat/completions", "", "gemma3"),
     ]
 
