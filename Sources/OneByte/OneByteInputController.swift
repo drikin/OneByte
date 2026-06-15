@@ -56,7 +56,9 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         menu.addItem(NSMenuItem(title: "直接入力モード", action: #selector(toggleDirectModeFromMenu), keyEquivalent: "j"))
         return menu
     }
-    @objc private func showPreferencesFromMenu() { (NSApp as? OneByteApplication)?.showPreferences(nil) }
+    @objc private func showPreferencesFromMenu() {
+        Task { @MainActor in (NSApp as? OneByteApplication)?.showPreferences(nil) }
+    }
     @objc private func toggleDirectModeFromMenu() {
         directMode.toggle()
         if let item = menu()?.item(at: 1) { item.state = directMode ? .on : .off }
@@ -188,7 +190,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
                     self.conversionHistory.append(self.sanitizeForHistory(result))
                     if self.conversionHistory.count > self.maxHistory { self.conversionHistory.removeFirst() }
                     // P3: Cache the result
-                    if self.conversionCache.count >= self.maxCacheSize { self.conversionCache.removeFirst() }
+                    if self.conversionCache.count >= self.maxCacheSize { self.conversionCache.removeAll() }
                     self.conversionCache[cacheKey] = result
                     client.insertText(result, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
                 }
