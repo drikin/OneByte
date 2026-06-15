@@ -176,19 +176,16 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
     // ── P0-2: Error visualization ──
     private func conversionFailed(client: IMKTextInput, original: String) {
-        // Show a brief flash of the error state by marking text with warning
+        let failedSeq = conversionSeq
         let warning = NSAttributedString(string: "⚠️ \(original)", attributes: [
             .foregroundColor: NSColor.red,
             .backgroundColor: NSColor.yellow.withAlphaComponent(0.3)
         ])
         client.setMarkedText(warning, selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
-        // After 1.5s, revert to the original text
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 1_500_000_000)
-            await MainActor.run {
-                guard let self = self, !self.converting else { return }
-                client.insertText(original, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
-            }
+            guard let self = self, failedSeq == self.conversionSeq, !self.converting else { return }
+            await MainActor.run { client.insertText(original, replacementRange: NSRange(location: NSNotFound, length: NSNotFound)) }
         }
     }
 
