@@ -48,28 +48,21 @@ This is a test.
 
 ## キーバインド
 
-| キー | 動作 | カテゴリ |
-|---|---|---|
-| **Enter** | 全文を日本語に変換・確定 | 変換 |
-| **Shift+Enter** | 日本語にしてから英訳・確定 | 変換 |
-| **Tab** | ローマ字のまま確定（LLMを通さない） | 変換 |
-| **Space** | 文節区切り（長文を分割したいときに） | 編集 |
-| **Backspace** | 1文字削除 / 前の文節に戻る | 編集 |
-| **Escape** | 全文クリア | 編集 |
-| **Cmd+任意** | アプリへ素通り（コピペ・全選択等） | パススルー |
-|| **Ctrl+J** | 直接入力モードON/OFFトグル（英字を直接打ちたいとき） | モード切替 |
+| キー | 動作 |
+|---|---|
+| **Enter** | 全文を日本語に変換・確定 |
+| **Shift+Enter** | 日本語にしてから英訳・確定 |
+| **Tab** | ローマ字のまま確定（LLMを通さない） |
+| **Space** | 文節区切り（長文を分割したいときに） |
+| **Ctrl+J** | 直接入力モードON/OFF（英字を直接打ちたいとき） |
+| **Backspace** | 1文字削除 / 前の文節に戻る |
+| **Escape** | 全文クリア |
+| **Cmd+任意** | アプリへ素通り（コピペ・全選択等） |
 
 ## 必要条件
 
 - macOS 15+ (Sequoia) — Apple Silicon (arm64)
-- 起動中の vLLM サーバーインスタンス（デフォルト: `100.78.215.127:8000`、モデル: `spark-local`）
-- LLMサーバーへのネットワーク接続（ソース内の `inferenceURL` を変更すれば他のエンドポイントも可）
-
-**バックエンドの選択肢（参考）:**
-- **Ollama** — 最も手軽。Apple Silicon上のローカルLLMなら `ollama pull <model>` で即座に起動
-- **LM Studio** — GUIでモデル管理。ローカルサーバーとしても使える
-- **vLLM** — OneByte開発環境で使用。DGX Sparkクラスタ上で動作
-- **MLX** — Apple Silicon特化。MPSバックエンドで効率的
+- 起動中の LLM API サーバー（デフォルト: Spark2 vLLM）
 
 ## インストール
 
@@ -83,17 +76,47 @@ bash build-and-install.sh
 # ビルドが成功したらインストール
 sudo cp -r "/tmp/OneByte_Build/OneByte.app" "/Library/Input Methods/"
 sudo chmod -R 755 "/Library/Input Methods/OneByte.app"
-# Gatekeeperの実行制限を解除（署名なしアプリ向け）
 sudo xattr -cr "/Library/Input Methods/OneByte.app"
 ```
 
-インストール後、**システム設定 > キーボード > 入力ソース** を開き、「OneByte」を追加してください。
+インストール後、**システム設定 > キーボード > 入力ソース** を開き、「OneByte」を追加してください。**ログアウト／再起動が必要な場合があります。**
 
-**ログアウト／再起動が必要な場合があります。**
+## LLMの設定
+
+メニューバーのOneByteアイコン → **設定...** から、LLMのエンドポイント・APIキー・モデル名を変更できます。
+
+**デフォルト:** Spark2 vLLM（`spark-local`、自宅LAN）
+
+| フィールド | 説明 |
+|---|---|
+| API Endpoint | LLM APIのURL（OpenAI互換） |
+| API Key | Bearer認証トークン（空欄可） |
+| Model | モデル名 |
+
+**プリセット:**
+- **Spark2 vLLM** — 自宅のDGX Sparkクラスタ（最速・無料）
+- **OpenAI GPT-4o-mini** — クラウド、APIキーが必要
+- **Ollama ローカル** — `localhost:11434` で動くOllama
+
+### ターミナルから設定する場合
+
+```bash
+# OpenAI に変更
+defaults write com.drikin.inputmethod.OneByte OneByteEndpoint "https://api.openai.com/v1/chat/completions"
+defaults write com.drikin.inputmethod.OneByte OneByteAPIKey "sk-xxxxx"
+defaults write com.drikin.inputmethod.OneByte OneByteModel "gpt-4o-mini"
+
+# ローカルvLLM に変更
+defaults write com.drikin.inputmethod.OneByte OneByteEndpoint "http://localhost:8000/v1/chat/completions"
+defaults write com.drikin.inputmethod.OneByte OneByteModel "qwen"
+
+# 確認
+defaults read com.drikin.inputmethod.OneByte
+```
 
 ## アーキテクチャ
 
-OneByte は `handleEvent:client:` ですべてのキーイベントを一元管理（Apple推奨パターン）。`Cmd+` キーは即座に素通りさせ、それ以外は `DispatchQueue.main.sync` 経由で処理（※`@MainActor`境界を安全に越えるための意図的な設計。`sync`を使うのは `handleEvent` の戻り値を即座に返す必要があるため）。変換は Swift Concurrency (`Task`) で非同期実行、タイムアウト3秒、エラー時はローマ字フォールバック。
+OneByte は `handleEvent:client:` ですべてのキーイベントを一元管理（Apple推奨パターン）。`Cmd+` キー・`Ctrl+J` の直接入力モード時は即座に素通りさせ、それ以外は `DispatchQueue.main.sync` 経由で処理。変換は Swift Concurrency (`Task`) で非同期実行、タイムアウト3秒、エラー時はローマ字フォールバック。
 
 ```
 handleEvent → handleOnMain → [キー蓄積]
@@ -102,39 +125,12 @@ handleEvent → handleOnMain → [キー蓄積]
 ```
 
 ### 設計判断
-- **左右Cmdの判別**: 採用せず。`NSEvent.ModifierFlags.rightCommand` は実際には存在しないAPIだった（キーコードベースの判別も誤検知が多く断念）。代わりに `Shift+Enter` で英訳。
+
+- **Ctrl+J トグル**: CapsLockに頼らず、IMEだけで完結する直接入力モード。CapsLockはOSの入力ソース切替機能を使えばOneByte ↔ U.S.を切り替え可能。
 - **文節配列** (`phrases:[String] + current:String`): Spaceで文節を区切り、LLMには連結した全文を渡すことで文脈を考慮した変換を実現。
-- **端末上のフォールバック**: 未実装。LLMに繋がらない場合はローマ字をそのまま確定する。Mozcベースのローカル変換エンジンは将来の検討課題。
-- **isActiveフラグ**: `deactivateServer` 時にフラグを落とし、ゾンビTaskによるclient参照を防止。
-- **phrases上限（20件）**: メモリ消費とLLMプロンプト長の制御のため、超えたら古いものから削除。
-
-## LLMエンドポイントの設定
-
-OneByteはデフォルトで OpenAI API（`gpt-4o-mini`）を使用します。APIキーが設定されていない場合、リクエストは認証なしで送信されます。
-
-**ターミナルで設定（永続化）:**
-
-| キー | 説明 | デフォルト |
-|---|---|---|
-| `OneByteEndpoint` | LLM APIエンドポイントURL | `http://100.78.215.127:8000/v1/chat/completions` |
-|| `OneByteAPIKey` | Bearer認証トークン（空なら未設定） | なし |
-|| `OneByteModel` | モデル名 | `spark-local` |
-
-```bash
-# 例: OpenAI
-defaults write com.drikin.inputmethod.OneByte OneByteEndpoint "https://api.openai.com/v1/chat/completions"
-defaults write com.drikin.inputmethod.OneByte OneByteAPIKey "sk-xxxxx"
-defaults write com.drikin.inputmethod.OneByte OneByteModel "gpt-4o-mini"
-
-# 例: ローカルvLLM
-defaults write com.drikin.inputmethod.OneByte OneByteEndpoint "http://localhost:8000/v1/chat/completions"
-defaults write com.drikin.inputmethod.OneByte OneByteModel "qwen"
-
-# 確認
-defaults read com.drikin.inputmethod.OneByte
-```
-
-変更後は **ログアウト／ログイン** または OneByte プロセスを再起動してください。
+- **変換中のキー入力ブロックなし**: `converting` フラグは変換の二重トリガー防止のみに使用。キー入力は常に受け付ける。
+- **LLMエンドポイントのカスタマイズ**: 設定画面（SwiftUI）からエンドポイント・APIキー・モデルを変更可能。設定は `UserDefaults` に保存され、次回変換から即座に反映。
+- **変換のフォールバック**: LLMに繋がらない場合（タイムアウト・エラー）、ローマ字をそのまま確定する。常に動く。
 
 ## ライセンス
 
