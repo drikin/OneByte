@@ -41,9 +41,13 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
     override public func menu() -> NSMenu! {
         let menu = NSMenu()
-        let item = NSMenuItem(title: "設定...", action: #selector(OneByteApplication.showPreferences(_:)), keyEquivalent: ",")
+        let item = NSMenuItem(title: "設定...", action: #selector(showPreferencesFromMenu), keyEquivalent: ",")
         menu.addItem(item)
         return menu
+    }
+
+    @objc private func showPreferencesFromMenu() {
+        (NSApp as? OneByteApplication)?.showPreferences(nil)
     }
 
     private var fullText: String {
