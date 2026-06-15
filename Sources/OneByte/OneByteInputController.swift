@@ -17,17 +17,16 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     private var phrases: [String] = []
     private var current: String = ""
     private let session: URLSession = { let c = URLSessionConfiguration.default; c.timeoutIntervalForRequest = 3.0; c.timeoutIntervalForResource = 5.0; return URLSession(configuration: c) }()
-    private let inferenceURL: URL = {
-        // UserDefaults keys: OneByteEndpoint (URL), OneByteAPIKey, OneByteModel
+    private var inferenceURL: URL {
         if let saved = UserDefaults.standard.string(forKey: "OneByteEndpoint"),
            let url = URL(string: saved) { return url }
-        return URL(string: "https://api.openai.com/v1/chat/completions")!
-    }()
+        return URL(string: "http://100.78.215.127:8000/v1/chat/completions")!
+    }
     private var apiKey: String {
         UserDefaults.standard.string(forKey: "OneByteAPIKey") ?? ""
     }
     private var modelName: String {
-        UserDefaults.standard.string(forKey: "OneByteModel") ?? "gpt-4o-mini"
+        UserDefaults.standard.string(forKey: "OneByteModel") ?? "spark-local"
     }
     private var converting = false
     private var conversionTask: Task<Void, Never>?
