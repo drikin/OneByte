@@ -221,6 +221,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         if romaji.utf16.count < 5 {
             prompt += " This is a short word. Choose the most common/standard Japanese form."
         }
+        prompt += " Spaces in the input may indicate word/phrase boundaries — use as hints for phrasing."
         // App context mapping
         if !appName.isEmpty {
             prompt += " Active application: \(appName). Adapt vocabulary accordingly."
