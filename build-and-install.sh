@@ -45,6 +45,7 @@ swiftc \
   -sdk "$(xcrun --show-sdk-path --sdk macosx)" \
   -framework Cocoa \
   -framework InputMethodKit \
+  -framework SwiftUI \
   -o "$BUILD_DIR/$APP_NAME.app/Contents/MacOS/$APP_NAME" \
   "$SRC_DIR/Sources/OneByte/AppDelegate.swift" \
   "$SRC_DIR/Sources/OneByte/OneByteInputController.swift" \
