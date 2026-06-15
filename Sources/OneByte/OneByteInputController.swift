@@ -37,6 +37,15 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     // Ctrl+J toggles direct/passthrough mode
     private var directMode = false
 
+    private var preferencesMenuItem: NSMenuItem?
+
+    override func menu() -> NSMenu! {
+        let menu = NSMenu()
+        let item = NSMenuItem(title: "設定...", action: #selector(OneByteApplication.showPreferences(_:)), keyEquivalent: ",")
+        menu.addItem(item)
+        return menu
+    }
+
     private var fullText: String {
         if current.isEmpty { return phrases.joined(separator: " ") }
         return (phrases + [current]).joined(separator: " ")
