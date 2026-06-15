@@ -2,6 +2,7 @@ import Cocoa
 import InputMethodKit
 
 @objc(OneByteApplication)
+@main
 final class OneByteApplication: NSApplication, NSApplicationDelegate {
     var server: IMKServer!
     var preferencesController: PreferencesController?
