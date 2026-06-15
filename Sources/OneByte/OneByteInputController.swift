@@ -22,7 +22,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     private var converting = false
     private var conversionTask: Task<Void, Never>?
     private var directMode = false
-    private var conversionSeq = 0       // ← P0-1: sequence ID for race condition
+    private var conversionSeq = 0
 
     // ── LLM config ──
     private let session: URLSession = { let c = URLSessionConfiguration.default; c.timeoutIntervalForRequest = 3.0; c.timeoutIntervalForResource = 5.0; return URLSession(configuration: c) }()
@@ -34,7 +34,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     private var apiKey: String { UserDefaults.standard.string(forKey: "OneByteAPIKey") ?? "" }
     private var modelName: String { UserDefaults.standard.string(forKey: "OneByteModel") ?? "spark-local" }
 
-    // ── P1-4: Conversion history ──
+    // ── Conversion history ──
     private var conversionHistory: [String] = []
     private let maxHistory = 5
 
@@ -53,7 +53,6 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     @objc private func showPreferencesFromMenu() { (NSApp as? OneByteApplication)?.showPreferences(nil) }
     @objc private func toggleDirectModeFromMenu() {
         directMode.toggle()
-        // Update menu checkbox state
         if let item = menu()?.item(at: 1) { item.state = directMode ? .on : .off }
     }
 
@@ -117,7 +116,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
             if !fullText.isEmpty { commitAsIs(client: client) }
             return true
         }
-        let accepted = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ,.!?\'\"-:;@#$%^&*()_+=[]{}|\\/~`<>　１２３４５６７８９０ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ”！＃＄％＆＇（）＊＋，−．／：；＜＝＞？＠［＼］＾＿｀｛｜｝～")
+        let accepted = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ,.!?\"'-:;@#$%^&*()_+=[]{}|\\/~`<>　１２３４５６７８９０ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ”！＃＄％＆＇（）＊＋，−．／：；＜＝＞？＠［＼］＾＿｀｛｜｝～")
         guard chars.rangeOfCharacter(from: accepted.inverted) == nil else {
             if !fullText.isEmpty { doConvert(client: client, mode: .toJapanese) }
             return false
@@ -137,7 +136,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     @objc(inputText:client:)
     nonisolated override public func inputText(_ string: String!, client sender: Any!) -> Bool { return false }
 
-    // ── P0-1: Race-condition-safe conversion ──
+    // ── Conversion (race-condition-safe) ──
     private func doConvert(client: IMKTextInput, mode: ConvertMode) {
         if converting { return }
         let text = fullText
@@ -151,21 +150,18 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         conversionTask?.cancel()
         conversionTask = Task { [weak self] in
             guard let self = self else { return }
+            let isProperNoun = text.unicodeScalars.first.map { CharacterSet.uppercaseLetters.contains($0) } ?? false
             let result: String
             switch mode {
-            case .toJapanese: result = await self.convertRomaji(text, context: context, appName: appName)
-            case .toEnglish: let jp = await self.convertRomaji(text, context: context, appName: appName); guard !Task.isCancelled else { return }; result = await self.translateToEnglish(jp)
+            case .toJapanese: result = await self.convertRomaji(text, context: context, appName: appName, isProperNoun: isProperNoun)
+            case .toEnglish: let jp = await self.convertRomaji(text, context: context, appName: appName, isProperNoun: isProperNoun); guard !Task.isCancelled else { return }; result = await self.translateToEnglish(jp)
             }
-            guard !Task.isCancelled else { return }
-            // P0-1: Discard if a newer conversion was started
-            if mySeq != self.conversionSeq { return }
+            guard !Task.isCancelled, mySeq == self.conversionSeq else { return }
             await MainActor.run {
                 self.converting = false
-                // P0-2: Show error in result if it's the fallback
                 if result == text {
-                    self.conversionFailed(client: client, original: text)
+                    self.conversionFailed(client: client, original: text, failedSeq: mySeq)
                 } else {
-                    // P1-4: Save to history
                     self.conversionHistory.append(result)
                     if self.conversionHistory.count > self.maxHistory { self.conversionHistory.removeFirst() }
                     client.insertText(result, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
@@ -174,9 +170,8 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         }
     }
 
-    // ── P0-2: Error visualization ──
-    private func conversionFailed(client: IMKTextInput, original: String) {
-        let failedSeq = conversionSeq
+    // ── Error visualization with seq guard ──
+    private func conversionFailed(client: IMKTextInput, original: String, failedSeq: Int) {
         let warning = NSAttributedString(string: "⚠️ \(original)", attributes: [
             .foregroundColor: NSColor.red,
             .backgroundColor: NSColor.yellow.withAlphaComponent(0.3)
@@ -190,11 +185,22 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     }
 
     // ── LLM calls ──
-    private func convertRomaji(_ romaji: String, context: String, appName: String) async -> String {
-        var systemPrompt = "Convert the following romaji text to natural Japanese. Fix any typos, missing letters, repeated words, and make it natural. Output ONLY the converted Japanese text. No explanation. No quotes."
-        // P1-3: Active app context
+    private func convertRomaji(_ romaji: String, context: String, appName: String, isProperNoun: Bool) async -> String {
+        var systemPrompt: String
+        if isProperNoun {
+            systemPrompt = "This text appears to be a proper noun (name, brand, etc.) written in romaji. " +
+                "If it's a known Japanese name/brand, convert it to the correct Japanese form. " +
+                "If it's a foreign name, keep it as-is or convert to katakana reading if appropriate. " +
+                "Output ONLY the converted text. No explanation."
+        } else if romaji.utf16.count < 5 {
+            systemPrompt = "Convert this short romaji word to natural Japanese. " +
+                "Choose the most common/standard Japanese form. Output ONLY the Japanese word."
+        } else {
+            systemPrompt = "Convert the following romaji text to natural Japanese. " +
+                "Fix any typos, missing letters, repeated words, and make it natural. " +
+                "Output ONLY the converted Japanese text. No explanation. No quotes."
+        }
         if !appName.isEmpty { systemPrompt += "\n\nActive application: \(appName). Adapt vocabulary accordingly." }
-        // P1-4: Recent conversions as context
         if !context.isEmpty { systemPrompt += "\n\nRecent conversions for style reference:\n\(context)" }
         let body: [String: Any] = ["model": modelName, "messages": [["role": "system", "content": systemPrompt], ["role": "user", "content": romaji]], "max_tokens": 60, "temperature": 0.1]
         return await callLLM(body: body, fallback: romaji)
