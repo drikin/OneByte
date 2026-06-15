@@ -14,70 +14,71 @@ extension IMKInputController {
 
 @objc(OneByteInputController)
 nonisolated public final class OneByteInputController: IMKInputController, @unchecked Sendable {
+    // ── Buffer ──
     private var phrases: [String] = []
     private var current: String = ""
+    private let maxPhrases = 20
+    private let maxCurrentLen = 200
+    private var converting = false
+    private var conversionTask: Task<Void, Never>?
+    private var directMode = false
+    private var conversionSeq = 0       // ← P0-1: sequence ID for race condition
+
+    // ── LLM config ──
     private let session: URLSession = { let c = URLSessionConfiguration.default; c.timeoutIntervalForRequest = 3.0; c.timeoutIntervalForResource = 5.0; return URLSession(configuration: c) }()
     private var inferenceURL: URL {
         if let saved = UserDefaults.standard.string(forKey: "OneByteEndpoint"),
            let url = URL(string: saved) { return url }
         return URL(string: "http://100.78.215.127:8000/v1/chat/completions")!
     }
-    private var apiKey: String {
-        UserDefaults.standard.string(forKey: "OneByteAPIKey") ?? ""
-    }
-    private var modelName: String {
-        UserDefaults.standard.string(forKey: "OneByteModel") ?? "spark-local"
-    }
-    private var converting = false
-    private var conversionTask: Task<Void, Never>?
-    private let maxPhrases = 20
-    private let maxCurrentLen = 200
+    private var apiKey: String { UserDefaults.standard.string(forKey: "OneByteAPIKey") ?? "" }
+    private var modelName: String { UserDefaults.standard.string(forKey: "OneByteModel") ?? "spark-local" }
 
-    // Ctrl+J toggles direct/passthrough mode
-    private var directMode = false
-
-    private var preferencesMenuItem: NSMenuItem?
-
-    override public func menu() -> NSMenu! {
-        let menu = NSMenu()
-        let item = NSMenuItem(title: "設定...", action: #selector(showPreferencesFromMenu), keyEquivalent: ",")
-        menu.addItem(item)
-        return menu
-    }
-
-    @objc private func showPreferencesFromMenu() {
-        (NSApp as? OneByteApplication)?.showPreferences(nil)
-    }
+    // ── P1-4: Conversion history ──
+    private var conversionHistory: [String] = []
+    private let maxHistory = 5
 
     private var fullText: String {
         if current.isEmpty { return phrases.joined(separator: " ") }
         return (phrases + [current]).joined(separator: " ")
     }
 
+    // ── Menu ──
+    override public func menu() -> NSMenu! {
+        let menu = NSMenu()
+        menu.addItem(NSMenuItem(title: "設定...", action: #selector(showPreferencesFromMenu), keyEquivalent: ","))
+        menu.addItem(NSMenuItem(title: "直接入力モード", action: #selector(toggleDirectModeFromMenu), keyEquivalent: "j"))
+        return menu
+    }
+    @objc private func showPreferencesFromMenu() { (NSApp as? OneByteApplication)?.showPreferences(nil) }
+    @objc private func toggleDirectModeFromMenu() {
+        directMode.toggle()
+        // Update menu checkbox state
+        if let item = menu()?.item(at: 1) { item.state = directMode ? .on : .off }
+    }
+
+    // ── Lifecycle ──
     @objc(deactivateServer:)
     nonisolated override public func deactivateServer(_ sender: Any!) {
-        conversionTask?.cancel(); conversionTask = nil; phrases = []; current = ""; converting = false
+        conversionTask?.cancel(); conversionTask = nil
+        phrases = []; current = ""; converting = false; conversionHistory = []
         super.deactivateServer(sender)
     }
 
+    // ── handleEvent ──
     @objc(handleEvent:client:)
     nonisolated override public func handle(_ event: NSEvent?, client sender: Any?) -> Bool {
         guard let event = event, event.type == .keyDown else { return false }
 
-        // Ctrl+J toggles direct mode (independent of CapsLock — removed)
         if event.modifierFlags.contains(.control) && event.keyCode == 0x26 {
             directMode.toggle()
             if directMode, let client = unwrap(wrap(sender)) as? IMKTextInput {
                 if !fullText.isEmpty { commitAsIs(client: client) }
-                // Clear marked text if buffer was empty
                 client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
             }
             return true
         }
-
         if event.modifierFlags.contains(.command) { return false }
-
-        // Direct mode = pass through all keys (like CapsLock did)
         if directMode { return false }
 
         guard let chars = event.characters else { return false }
@@ -91,6 +92,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         }
     }
 
+    // ── Key handler ──
     private func handleOnMain(chars: String, keyCode: UInt16, isShift: Bool, client: IMKTextInput?) -> Bool {
         guard let client = client else { return false }
 
@@ -99,7 +101,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
             else if !phrases.isEmpty { current = phrases.removeLast(); updateMarked(client: client); return true }
             return false
         }
-        if keyCode == 0x35 { phrases = []; current = ""; let a = NSAttributedString(string: ""); client.setMarkedText(a, selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0)); return true }
+        if keyCode == 0x35 { phrases = []; current = ""; client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0)); return true }
         if chars == " " {
             if !current.isEmpty {
                 if phrases.count >= maxPhrases { phrases.removeFirst() }
@@ -126,8 +128,8 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     }
 
     private func updateMarked(client: IMKTextInput) {
-        let text = fullText; let attr = NSAttributedString(string: text)
-        client.setMarkedText(attr, selectionRange: NSRange(location: text.utf16.count, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+        let text = fullText
+        client.setMarkedText(NSAttributedString(string: text), selectionRange: NSRange(location: text.utf16.count, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
     }
 
     private enum ConvertMode { case toJapanese, toEnglish }
@@ -135,32 +137,69 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     @objc(inputText:client:)
     nonisolated override public func inputText(_ string: String!, client sender: Any!) -> Bool { return false }
 
-    private func commitAsIs(client: IMKTextInput) {
-        conversionTask?.cancel(); conversionTask = nil
-        let text = fullText; phrases = []; current = ""; converting = false
-        client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
-        client.insertText(text, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
-    }
-
+    // ── P0-1: Race-condition-safe conversion ──
     private func doConvert(client: IMKTextInput, mode: ConvertMode) {
         if converting { return }
-        let text = fullText; phrases = []; current = ""; converting = true
+        let text = fullText
+        let context = conversionHistory.suffix(3).joined(separator: "\n")
+        let appName = NSWorkspace.shared.frontmostApplication?.localizedName ?? ""
+        phrases = []; current = ""; converting = true
+        conversionSeq += 1
+        let mySeq = conversionSeq
         client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+
+        conversionTask?.cancel()
         conversionTask = Task { [weak self] in
             guard let self = self else { return }
             let result: String
             switch mode {
-            case .toJapanese: result = await self.convertRomaji(text)
-            case .toEnglish: let jp = await self.convertRomaji(text); guard !Task.isCancelled else { return }; result = await self.translateToEnglish(jp)
+            case .toJapanese: result = await self.convertRomaji(text, context: context, appName: appName)
+            case .toEnglish: let jp = await self.convertRomaji(text, context: context, appName: appName); guard !Task.isCancelled else { return }; result = await self.translateToEnglish(jp)
             }
             guard !Task.isCancelled else { return }
-            await MainActor.run { self.converting = false; client.insertText(result, replacementRange: NSRange(location: NSNotFound, length: NSNotFound)) }
+            // P0-1: Discard if a newer conversion was started
+            if mySeq != self.conversionSeq { return }
+            await MainActor.run {
+                self.converting = false
+                // P0-2: Show error in result if it's the fallback
+                if result == text {
+                    self.conversionFailed(client: client, original: text)
+                } else {
+                    // P1-4: Save to history
+                    self.conversionHistory.append(result)
+                    if self.conversionHistory.count > self.maxHistory { self.conversionHistory.removeFirst() }
+                    client.insertText(result, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
+                }
+            }
         }
     }
 
-    private func convertRomaji(_ romaji: String) async -> String {
-        let prompt = "Convert the following romaji text to natural Japanese. Fix any typos, missing letters, repeated words, and make it natural. Output ONLY the converted Japanese text. No explanation. No quotes."
-        let body: [String: Any] = ["model": modelName, "messages": [["role": "system", "content": prompt], ["role": "user", "content": romaji]], "max_tokens": 60, "temperature": 0.1]
+    // ── P0-2: Error visualization ──
+    private func conversionFailed(client: IMKTextInput, original: String) {
+        // Show a brief flash of the error state by marking text with warning
+        let warning = NSAttributedString(string: "⚠️ \(original)", attributes: [
+            .foregroundColor: NSColor.red,
+            .backgroundColor: NSColor.yellow.withAlphaComponent(0.3)
+        ])
+        client.setMarkedText(warning, selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+        // After 1.5s, revert to the original text
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            await MainActor.run {
+                guard let self = self, !self.converting else { return }
+                client.insertText(original, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
+            }
+        }
+    }
+
+    // ── LLM calls ──
+    private func convertRomaji(_ romaji: String, context: String, appName: String) async -> String {
+        var systemPrompt = "Convert the following romaji text to natural Japanese. Fix any typos, missing letters, repeated words, and make it natural. Output ONLY the converted Japanese text. No explanation. No quotes."
+        // P1-3: Active app context
+        if !appName.isEmpty { systemPrompt += "\n\nActive application: \(appName). Adapt vocabulary accordingly." }
+        // P1-4: Recent conversions as context
+        if !context.isEmpty { systemPrompt += "\n\nRecent conversions for style reference:\n\(context)" }
+        let body: [String: Any] = ["model": modelName, "messages": [["role": "system", "content": systemPrompt], ["role": "user", "content": romaji]], "max_tokens": 60, "temperature": 0.1]
         return await callLLM(body: body, fallback: romaji)
     }
 
@@ -170,8 +209,16 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         return await callLLM(body: body, fallback: japanese)
     }
 
+    private func commitAsIs(client: IMKTextInput) {
+        conversionTask?.cancel(); conversionTask = nil
+        let text = fullText; phrases = []; current = ""; converting = false
+        client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+        client.insertText(text, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
+    }
+
     private func callLLM(body: [String: Any], fallback: String) async -> String {
-        var req = URLRequest(url: inferenceURL); req.httpMethod = "POST"
+        var req = URLRequest(url: inferenceURL)
+        req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if !apiKey.isEmpty { req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization") }
         do {
