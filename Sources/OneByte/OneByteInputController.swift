@@ -117,7 +117,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
             if !fullText.isEmpty { commitAsIs(client: client) }
             return true
         }
-        let accepted = CharacterSet.lowercaseLetters.union(.uppercaseLetters).union(CharacterSet(charactersIn: " ,.!?'-")).union(.decimalDigits).union(.alphanumerics).union(CharacterSet(charactersIn: "１２３４５６７８９０ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ　！＂＃＄％＆＇（）＊＋，−．／：；＜＝＞？＠［＼］＾＿｀｛｜｝～"))
+        let accepted = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ,.!?\'\"-:;@#$%^&*()_+=[]{}|\\/~`<>　１２３４５６７８９０ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ”！＃＄％＆＇（）＊＋，−．／：；＜＝＞？＠［＼］＾＿｀｛｜｝～")
         guard chars.rangeOfCharacter(from: accepted.inverted) == nil else {
             if !fullText.isEmpty { doConvert(client: client, mode: .toJapanese) }
             return false
