@@ -27,22 +27,20 @@ struct PreferencesPanel: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("OneByte 設定").font(.title2).bold()
-
             Picker("", selection: $selectedTab) {
                 Text("LLM設定").tag(0)
-                Text("ユーザー辞書").tag(1)
+                Text("辞書").tag(1)
             }
             .pickerStyle(.segmented)
 
             if selectedTab == 0 {
-                LLMSettingsView()
+                Text("LLM設定タブ").font(.title)
             } else {
-                DictionaryView()
+                Text("辞書タブ").font(.title)
             }
         }
         .padding(20)
-        .frame(width: 560, height: 520)
+        .frame(width: 400, height: 200)
     }
 }
 
