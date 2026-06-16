@@ -151,6 +151,13 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         return String(String.UnicodeScalarView(safe)).trimmingCharacters(in: .whitespaces)
     }
 
+    // ── User dictionary (lazy singleton) ──
+    private static var _dict: UserDictionary?
+    private static var dict: UserDictionary {
+        if _dict == nil { _dict = UserDictionary() }
+        return _dict!
+    }
+
     // ── Conversion (race-condition-safe) ──
     private func doConvert(client: IMKTextInput, mode: ConvertMode) {
         if converting { return }
@@ -170,15 +177,40 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
             return
         }
 
+        // Dictionary: match & replace with placeholders
+        let dict = Self.dict
+        let (modifiedText, placeholders) = dict.matchAndReplace(text)
+
+        // Check if dictionary covered everything
+        let isDictOnly = !modifiedText.contains { !$0.isWhitespace && $0 != "§" && !$0.isNumber }
+
+        if isDictOnly {
+            // All matched by dictionary — no LLM call needed, just restore placeholders
+            converting = false
+            let result = dict.restorePlaceholders(in: modifiedText, placeholders: placeholders)
+            conversionHistory.append(sanitizeForHistory(result))
+            if conversionHistory.count > maxHistory { conversionHistory.removeFirst() }
+            conversionCache[cacheKey] = result
+            client.insertText(result, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
+            return
+        }
+
         conversionTask?.cancel()
         conversionTask = Task { [weak self] in
             guard let self = self else { return }
-            // P2: Proper noun detection — any uppercase letter in text
             let isProperNoun = text.unicodeScalars.contains { CharacterSet.uppercaseLetters.contains($0) }
             let result: String
             switch mode {
-            case .toJapanese: result = await self.convertRomaji(text, context: context, appName: appName, isProperNoun: isProperNoun)
-            case .toEnglish: let jp = await self.convertRomaji(text, context: context, appName: appName, isProperNoun: isProperNoun); guard !Task.isCancelled else { return }; result = await self.translateToEnglish(jp)
+            case .toJapanese:
+                // Pass the modified text (with placeholders) to LLM
+                let llmResult = await self.convertRomaji(modifiedText, context: context, appName: appName, isProperNoun: isProperNoun)
+                // Restore placeholders in LLM output
+                result = dict.restorePlaceholders(in: llmResult, placeholders: placeholders)
+            case .toEnglish:
+                let jp = await self.convertRomaji(modifiedText, context: context, appName: appName, isProperNoun: isProperNoun)
+                guard !Task.isCancelled else { return }
+                let restored = dict.restorePlaceholders(in: jp, placeholders: placeholders)
+                result = await self.translateToEnglish(restored)
             }
             guard !Task.isCancelled, mySeq == self.conversionSeq else { return }
             await MainActor.run {
@@ -186,10 +218,8 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
                 if result == text {
                     self.conversionFailed(client: client, original: text, failedSeq: mySeq)
                 } else {
-                    // P1: Sanitize before storing in history
                     self.conversionHistory.append(self.sanitizeForHistory(result))
                     if self.conversionHistory.count > self.maxHistory { self.conversionHistory.removeFirst() }
-                    // P3: Cache the result
                     if self.conversionCache.count >= self.maxCacheSize { self.conversionCache.removeAll() }
                     self.conversionCache[cacheKey] = result
                     client.insertText(result, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))

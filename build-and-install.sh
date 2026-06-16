@@ -49,7 +49,8 @@ swiftc \
   -o "$BUILD_DIR/$APP_NAME.app/Contents/MacOS/$APP_NAME" \
   "$SRC_DIR/Sources/OneByte/AppDelegate.swift" \
   "$SRC_DIR/Sources/OneByte/OneByteInputController.swift" \
-  "$SRC_DIR/Sources/OneByte/PreferencesController.swift"
+  "$SRC_DIR/Sources/OneByte/PreferencesController.swift" \
+  "$SRC_DIR/Sources/OneByte/UserDictionary.swift"
 
 echo ""
 echo "=== Build successful! ==="
