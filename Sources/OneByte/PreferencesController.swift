@@ -30,6 +30,7 @@ struct PreferencesPanel: View {
             LLMSettingsView().tabItem { Label("LLM設定", systemImage: "network") }.tag(0)
             DictionaryView().tabItem { Label("ユーザー辞書", systemImage: "book") }.tag(1)
         }
+        .tabViewStyle(.automatic)
         .padding(20)
         .frame(width: 560, height: 520)
     }
