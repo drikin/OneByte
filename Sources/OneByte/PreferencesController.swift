@@ -5,7 +5,7 @@ import SwiftUI
 class PreferencesController: NSWindowController {
     convenience init() {
         let hosting = NSHostingView(rootView: PreferencesPanel())
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 460),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 520),
                               styleMask: [.titled, .closable, .miniaturizable],
                               backing: .buffered, defer: false)
         window.title = "OneByte 設定"
@@ -31,7 +31,7 @@ struct PreferencesPanel: View {
             DictionaryView().tabItem { Label("ユーザー辞書", systemImage: "book") }.tag(1)
         }
         .padding(20)
-        .frame(width: 520, height: 460)
+        .frame(width: 560, height: 520)
     }
 }
 
