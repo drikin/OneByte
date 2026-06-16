@@ -52,7 +52,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     // ── Menu ──
     override public func menu() -> NSMenu! {
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "設定...", action: #selector(showPreferencesFromMenu), keyEquivalent: ","))
+        menu.addItem(NSMenuItem(title: "設定...", action: #selector(showPreferencesFromMenu), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "直接入力モード", action: #selector(toggleDirectModeFromMenu), keyEquivalent: "j"))
         return menu
     }
