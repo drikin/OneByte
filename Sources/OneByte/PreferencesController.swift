@@ -26,11 +26,21 @@ struct PreferencesPanel: View {
     @State private var selectedTab = 0
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            LLMSettingsView().tabItem { Label("LLM設定", systemImage: "network") }.tag(0)
-            DictionaryView().tabItem { Label("ユーザー辞書", systemImage: "book") }.tag(1)
+        VStack(spacing: 16) {
+            Text("OneByte 設定").font(.title2).bold()
+
+            Picker("", selection: $selectedTab) {
+                Text("LLM設定").tag(0)
+                Text("ユーザー辞書").tag(1)
+            }
+            .pickerStyle(.segmented)
+
+            if selectedTab == 0 {
+                LLMSettingsView()
+            } else {
+                DictionaryView()
+            }
         }
-        .tabViewStyle(.automatic)
         .padding(20)
         .frame(width: 560, height: 520)
     }
