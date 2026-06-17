@@ -50,18 +50,15 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     }
 
     // ── Menu ──
-    override public func menu() -> NSMenu! {
-        let menu = NSMenu(title: "OneByte")
-        let prefsItem = NSMenuItem(title: "設定...", action: #selector(showPreferencesFromMenu), keyEquivalent: ",")
-        prefsItem.target = self
-        menu.addItem(prefsItem)
-        let dictItem = NSMenuItem(title: "OneByte辞書...", action: #selector(showDictionaryFromMenu), keyEquivalent: "")
-        dictItem.target = self
-        menu.addItem(dictItem)
-        let directItem = NSMenuItem(title: "直接入力モード", action: #selector(toggleDirectModeFromMenu), keyEquivalent: "")
-        directItem.target = self
-        menu.addItem(directItem)
-        return menu
+    @objc override var menu: NSMenu! {
+        get {
+            let m = NSMenu(title: "OneByte")
+            m.addItem(NSMenuItem(title: "設定...", action: #selector(showPreferencesFromMenu), keyEquivalent: ","))
+            m.addItem(NSMenuItem(title: "辞書管理...", action: #selector(showDictionaryFromMenu), keyEquivalent: ""))
+            m.addItem(NSMenuItem(title: "直接入力モード", action: #selector(toggleDirectModeFromMenu), keyEquivalent: ""))
+            return m
+        }
+        set {}
     }
     @objc private func showPreferencesFromMenu() {
         Task { @MainActor in (NSApp as? OneByteApplication)?.showPreferences(nil) }
