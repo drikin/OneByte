@@ -51,7 +51,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
     // ── Menu ──
     override public func menu() -> NSMenu! {
-        let menu = NSMenu()
+        let menu = NSMenu(title: "OneByte")
         let prefsItem = NSMenuItem(title: "設定...", action: #selector(showPreferencesFromMenu), keyEquivalent: ",")
         prefsItem.target = self
         menu.addItem(prefsItem)
