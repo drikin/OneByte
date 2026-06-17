@@ -88,6 +88,16 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
             }
             return true
         }
+        // Ctrl+Shift+P = preferences
+        if event.modifierFlags.contains([.control, .shift]) && event.keyCode == 35 {
+            Task { @MainActor in (NSApp as? OneByteApplication)?.showPreferences(nil) }
+            return true
+        }
+        // Ctrl+Shift+D = dictionary
+        if event.modifierFlags.contains([.control, .shift]) && event.keyCode == 2 {
+            Task { @MainActor in (NSApp as? OneByteApplication)?.showDictionary(nil) }
+            return true
+        }
         if event.modifierFlags.contains(.command) { return false }
         if directMode { return false }
 
