@@ -134,13 +134,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
             return false
         }
         if keyCode == 0x24 {
-            if !fullText.isEmpty { doConvert(client: client, mode: isShift ? .toEnglish : .toJapanese); return true }
-            // Re-convert: if buffer is empty but we have a previous conversion, revert and reconvert
-            if !lastConvertedRomaji.isEmpty && !lastConvertedResult.isEmpty {
-                // Revert to romaji and convert again
-                client.insertText(lastConvertedRomaji, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
-                lastConvertedRomaji = ""; lastConvertedResult = ""
-            }
+            if !fullText.isEmpty { doConvert(client: client, mode: isShift ? .toEnglish : .toJapanese) }
             return true
         }
         if chars == "\t" {
