@@ -58,7 +58,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         let dictItem = NSMenuItem(title: "ユーザー辞書...", action: #selector(showDictionaryFromMenu), keyEquivalent: "")
         dictItem.target = self
         menu.addItem(dictItem)
-        let directItem = NSMenuItem(title: "直接入力モード", action: #selector(toggleDirectModeFromMenu), keyEquivalent: "j")
+        let directItem = NSMenuItem(title: "直接入力モード", action: #selector(toggleDirectModeFromMenu), keyEquivalent: "")
         directItem.target = self
         menu.addItem(directItem)
         return menu
