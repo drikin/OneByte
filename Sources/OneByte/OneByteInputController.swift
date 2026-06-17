@@ -44,6 +44,10 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     // Allowed characters for sanitization (P1)
     private let allowedChars = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんがぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポ　、。！？ー「」・")
 
+    // ── Re-conversion buffer ──
+    private var lastConvertedRomaji: String = ""
+    private var lastConvertedResult: String = ""
+
     private var fullText: String {
         if current.isEmpty { return phrases.joined(separator: " ") }
         return (phrases + [current]).joined(separator: " ")
@@ -71,7 +75,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     @objc(deactivateServer:)
     nonisolated override public func deactivateServer(_ sender: Any!) {
         conversionTask?.cancel(); conversionTask = nil
-        phrases = []; current = ""; converting = false; conversionHistory = []
+        phrases = []; current = ""; converting = false; conversionHistory = []; lastConvertedRomaji = ""; lastConvertedResult = ""
         super.deactivateServer(sender)
     }
 
@@ -130,7 +134,13 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
             return false
         }
         if keyCode == 0x24 {
-            if !fullText.isEmpty { doConvert(client: client, mode: isShift ? .toEnglish : .toJapanese) }
+            if !fullText.isEmpty { doConvert(client: client, mode: isShift ? .toEnglish : .toJapanese); return true }
+            // Re-convert: if buffer is empty but we have a previous conversion, revert and reconvert
+            if !lastConvertedRomaji.isEmpty && !lastConvertedResult.isEmpty {
+                // Revert to romaji and convert again
+                client.insertText(lastConvertedRomaji, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
+                lastConvertedRomaji = ""; lastConvertedResult = ""
+            }
             return true
         }
         if chars == "\t" {
@@ -231,7 +241,9 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
                 if result == text {
                     self.conversionFailed(client: client, original: text, failedSeq: mySeq)
                 } else {
-                    self.conversionHistory.append(self.sanitizeForHistory(result))
+                    self.lastConvertedRomaji = text
+                    self.lastConvertedResult = result
+                    self.conversionHis...[truncated]
                     if self.conversionHistory.count > self.maxHistory { self.conversionHistory.removeFirst() }
                     if self.conversionCache.count >= self.maxCacheSize { self.conversionCache.removeAll() }
                     self.conversionCache[cacheKey] = result
