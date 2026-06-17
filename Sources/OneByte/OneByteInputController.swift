@@ -243,7 +243,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
                 } else {
                     self.lastConvertedRomaji = text
                     self.lastConvertedResult = result
-                    self.conversionHis...[truncated]
+                    self.conversionHistory.append(self.sanitizeForHistory(result))
                     if self.conversionHistory.count > self.maxHistory { self.conversionHistory.removeFirst() }
                     if self.conversionCache.count >= self.maxCacheSize { self.conversionCache.removeAll() }
                     self.conversionCache[cacheKey] = result
