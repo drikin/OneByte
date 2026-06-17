@@ -102,13 +102,14 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
             Task { @MainActor in (NSApp as? OneByteApplication)?.showDictionary(nil) }
             return true
         }
-        if event.modifierFlags.contains(.command) { return false }
-        // Cmd+Z: undo conversion (revert to romaji)
-        if event.modifierFlags.contains(.command) && keyCode == 6 {
-            if !lastConvertedRomaji.isEmpty {
-                let client = unwrap(wrap(sender)) as? IMKTextInput
-                client?.insertText(lastConvertedRomaji, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
-                lastConvertedRomaji = ""; lastConvertedResult = ""
+        if event.modifierFlags.contains(.command) {
+            // Cmd+Z: undo conversion (revert to romaji)
+            if event.keyCode == 6 && !lastConvertedRomaji.isEmpty {
+                if let client = unwrap(wrap(sender)) as? IMKTextInput {
+                    client.insertText(lastConvertedRomaji, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
+                    lastConvertedRomaji = ""; lastConvertedResult = ""
+                }
+                return true
             }
             return false
         }
