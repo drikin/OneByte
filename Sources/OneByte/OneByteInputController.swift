@@ -52,18 +52,26 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     // ── Menu ──
     override public func menu() -> NSMenu! {
         let menu = NSMenu()
-        let settingsItem = NSMenuItem(title: "設定...", action: #selector(showPreferencesFromMenu), keyEquivalent: "")
-        settingsItem.target = self
-        menu.addItem(settingsItem)
-        menu.addItem(NSMenuItem(title: "直接入力モード", action: #selector(toggleDirectModeFromMenu), keyEquivalent: "j"))
+        let prefsItem = NSMenuItem(title: "設定...", action: #selector(showPreferencesFromMenu), keyEquivalent: ",")
+        prefsItem.target = self
+        menu.addItem(prefsItem)
+        let dictItem = NSMenuItem(title: "ユーザー辞書...", action: #selector(showDictionaryFromMenu), keyEquivalent: "")
+        dictItem.target = self
+        menu.addItem(dictItem)
+        let directItem = NSMenuItem(title: "直接入力モード", action: #selector(toggleDirectModeFromMenu), keyEquivalent: "j")
+        directItem.target = self
+        menu.addItem(directItem)
         return menu
     }
     @objc private func showPreferencesFromMenu() {
         Task { @MainActor in (NSApp as? OneByteApplication)?.showPreferences(nil) }
     }
+    @objc private func showDictionaryFromMenu() {
+        Task { @MainActor in (NSApp as? OneByteApplication)?.showDictionary(nil) }
+    }
     @objc private func toggleDirectModeFromMenu() {
         directMode.toggle()
-        if let item = menu()?.item(at: 1) { item.state = directMode ? .on : .off }
+        if let item = menu()?.item(at: 2) { item.state = directMode ? .on : .off }
     }
 
     // ── Lifecycle ──

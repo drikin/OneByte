@@ -5,7 +5,7 @@ import SwiftUI
 class PreferencesController: NSWindowController {
     convenience init() {
         let hosting = NSHostingView(rootView: PreferencesPanel())
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 520),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 380),
                               styleMask: [.titled, .closable, .miniaturizable],
                               backing: .buffered, defer: false)
         window.title = "OneByte 設定"
@@ -23,29 +23,6 @@ class PreferencesController: NSWindowController {
 
 // MARK: - SwiftUI Preferences Panel
 struct PreferencesPanel: View {
-    @State private var selectedTab = 0
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Picker("", selection: $selectedTab) {
-                Text("LLM設定").tag(0)
-                Text("辞書").tag(1)
-            }
-            .pickerStyle(.segmented)
-
-            if selectedTab == 0 {
-                Text("LLM設定タブ").font(.title)
-            } else {
-                Text("辞書タブ").font(.title)
-            }
-        }
-        .padding(20)
-        .frame(width: 400, height: 200)
-    }
-}
-
-// MARK: - LLM Settings Tab
-struct LLMSettingsView: View {
     @AppStorage("OneByteEndpoint") var endpoint = "http://100.78.215.127:8000/v1/chat/completions"
     @AppStorage("OneByteAPIKey") var apiKey = ""
     @AppStorage("OneByteModel") var model = "spark-local"
@@ -63,6 +40,8 @@ struct LLMSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Text("OneByte 設定").font(.title2).bold()
+
             Group {
                 Text("API Endpoint").font(.caption).foregroundColor(.secondary)
                 TextField("https://api.openai.com/v1/chat/completions", text: $endpoint)
@@ -88,13 +67,25 @@ struct LLMSettingsView: View {
                 Button("接続テスト") { testConnection() }.disabled(testing)
                 if testing { ProgressView().scaleEffect(0.7) }
                 Spacer()
+                Button("閉じる") {
+                    UserDefaults.standard.synchronize()
+                    window?.close()
+                }
+                .keyboardShortcut(.cancelAction)
             }
 
             if !statusText.isEmpty {
                 Text(statusText).foregroundColor(statusColor).font(.caption)
             }
+
+            Text("変更後はOneByteを再起動するか、ログアウト/ログインしてください。")
+                .font(.caption).foregroundColor(.secondary)
         }
+        .padding(20)
+        .frame(width: 500, height: 400)
     }
+
+    private var window: NSWindow? { NSApp.keyWindow }
 
     private func testConnection() {
         testing = true; statusText = "テスト中..."; statusColor = .gray
@@ -104,7 +95,6 @@ struct LLMSettingsView: View {
             req.httpMethod = "POST"; req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             if !apiKey.isEmpty { req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization") }
             let body: [String: Any] = ["model": model, "messages": [["role": "user", "content": "Say 'OK'"]], "max_tokens": 5, "temperature": 0.1]
-
             do {
                 req.httpBody = try JSONSerialization.data(withJSONObject: body)
                 let config = URLSessionConfiguration.default; config.timeoutIntervalForRequest = 5.0
@@ -122,98 +112,5 @@ struct LLMSettingsView: View {
                 await MainActor.run { statusText = "❌ エラー: \(error.localizedDescription)"; statusColor = .red; testing = false }
             }
         }
-    }
-}
-
-// MARK: - User Dictionary Tab
-struct DictionaryView: View {
-    @State private var entries: [(key: String, value: String)] = []
-    @State private var newKey = ""
-    @State private var newValue = ""
-    @State private var searchText = ""
-    @State private var statusMessage = ""
-
-    private var filteredEntries: [(key: String, value: String)] {
-        if searchText.isEmpty { return entries }
-        return entries.filter { $0.key.localizedCaseInsensitiveContains(searchText) || $0.value.localizedCaseInsensitiveContains(searchText) }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Add form
-            HStack {
-                TextField("ローマ字（キー）", text: $newKey)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(.body, design: .monospaced))
-                    .frame(width: 160)
-                Text("→")
-                TextField("変換結果", text: $newValue)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 160)
-                Button("追加") { addEntry() }
-                    .disabled(newKey.trimmingCharacters(in: .whitespaces).isEmpty || newValue.trimmingCharacters(in: .whitespaces).isEmpty)
-                    .buttonStyle(.borderedProminent)
-            }
-
-            // Search
-            HStack {
-                Image(systemName: "magnifyingglass").foregroundColor(.secondary)
-                TextField("検索...", text: $searchText)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            // Entry list
-            List {
-                ForEach(filteredEntries.indices, id: \.self) { i in
-                    let entry = filteredEntries[i]
-                    HStack {
-                        Text(entry.key).font(.system(.body, design: .monospaced)).frame(width: 150, alignment: .leading)
-                        Text("→").foregroundColor(.secondary)
-                        Text(entry.value).frame(alignment: .leading)
-                        Spacer()
-                        Button("削除", role: .destructive) {
-                            deleteEntry(key: entry.key)
-                        }
-                        .buttonStyle(.borderless)
-                        .foregroundColor(.red)
-                    }
-                }
-            }
-            .listStyle(.plain)
-
-            // Status & count
-            HStack {
-                Text("\(entries.count) 件登録").font(.caption).foregroundColor(.secondary)
-                Spacer()
-                if !statusMessage.isEmpty {
-                    Text(statusMessage).font(.caption).foregroundColor(.secondary)
-                }
-            }
-        }
-        .onAppear { reload() }
-    }
-
-    private func reload() {
-        let dict = UserDictionary()
-        entries = dict.allEntries
-    }
-
-    private func addEntry() {
-        let key = newKey.trimmingCharacters(in: .whitespaces)
-        let value = newValue.trimmingCharacters(in: .whitespaces)
-        guard !key.isEmpty, !value.isEmpty else { return }
-
-        var dict = UserDictionary()
-        dict.set(key: key, value: value)
-        newKey = ""; newValue = ""
-        statusMessage = "「\(key)」→「\(value)」を追加しました"
-        reload()
-    }
-
-    private func deleteEntry(key: String) {
-        var dict = UserDictionary()
-        dict.remove(key: key)
-        statusMessage = "「\(key)」を削除しました"
-        reload()
     }
 }

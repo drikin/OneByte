@@ -50,6 +50,7 @@ swiftc \
   "$SRC_DIR/Sources/OneByte/AppDelegate.swift" \
   "$SRC_DIR/Sources/OneByte/OneByteInputController.swift" \
   "$SRC_DIR/Sources/OneByte/PreferencesController.swift" \
+  "$SRC_DIR/Sources/OneByte/DictionaryController.swift" \
   "$SRC_DIR/Sources/OneByte/UserDictionary.swift"
 
 echo ""

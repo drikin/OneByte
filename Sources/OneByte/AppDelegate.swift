@@ -6,6 +6,7 @@ import InputMethodKit
 final class OneByteApplication: NSApplication, NSApplicationDelegate {
     var server: IMKServer!
     var preferencesController: PreferencesController?
+    var dictionaryController: DictionaryController?
 
     override init() {
         super.init()
@@ -20,10 +21,15 @@ final class OneByteApplication: NSApplication, NSApplicationDelegate {
         let connName = Bundle.main.infoDictionary?["InputMethodConnectionName"] as? String
         server = IMKServer(name: connName, bundleIdentifier: Bundle.main.bundleIdentifier)
         preferencesController = PreferencesController()
+        dictionaryController = DictionaryController()
         NSLog("OneByte: server initialized")
     }
 
     @objc func showPreferences(_ sender: Any?) {
         preferencesController?.showWindow(sender)
+    }
+
+    @objc func showDictionary(_ sender: Any?) {
+        dictionaryController?.showWindow(sender)
     }
 }
