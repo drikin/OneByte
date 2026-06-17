@@ -49,23 +49,9 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         return (phrases + [current]).joined(separator: " ")
     }
 
-    // ── Menu ──
+    // ── Menu (macOS 26 IMK menu is unreliable; use NSStatusItem in AppDelegate instead) ──
     override public func menu() -> NSMenu! {
-        let m = NSMenu(title: "OneByte")
-        m.addItem(NSMenuItem(title: "設定...", action: #selector(showPreferencesFromMenu), keyEquivalent: ","))
-        m.addItem(NSMenuItem(title: "辞書管理...", action: #selector(showDictionaryFromMenu), keyEquivalent: ""))
-        m.addItem(NSMenuItem(title: "直接入力モード", action: #selector(toggleDirectModeFromMenu), keyEquivalent: ""))
-        return m
-    }
-    @objc private func showPreferencesFromMenu() {
-        Task { @MainActor in (NSApp as? OneByteApplication)?.showPreferences(nil) }
-    }
-    @objc private func showDictionaryFromMenu() {
-        Task { @MainActor in (NSApp as? OneByteApplication)?.showDictionary(nil) }
-    }
-    @objc private func toggleDirectModeFromMenu() {
-        directMode.toggle()
-        if let item = menu()?.item(at: 2) { item.state = directMode ? .on : .off }
+        return nil
     }
 
     // ── Lifecycle ──
