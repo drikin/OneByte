@@ -103,6 +103,15 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
             return true
         }
         if event.modifierFlags.contains(.command) { return false }
+        // Cmd+Z: undo conversion (revert to romaji)
+        if event.modifierFlags.contains(.command) && keyCode == 6 {
+            if !lastConvertedRomaji.isEmpty {
+                let client = unwrap(wrap(sender)) as? IMKTextInput
+                client?.insertText(lastConvertedRomaji, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
+                lastConvertedRomaji = ""; lastConvertedResult = ""
+            }
+            return false
+        }
         if directMode { return false }
 
         guard let chars = event.characters else { return false }
