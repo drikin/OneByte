@@ -135,12 +135,15 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         }
 
         if keyCode == 0x33 {
-            if inCandidateMode { exitCandidateMode(client: client); return true }
+            if inCandidateMode { cancelCandidateMode(client: client); return true }
             if !current.isEmpty { current.removeLast(); updateMarked(client: client); return true }
             else if !phrases.isEmpty { current = phrases.removeLast(); updateMarked(client: client); return true }
             return false
         }
-        if keyCode == 0x35 { phrases = []; current = ""; exitCandidateMode(client: client); return true }
+        if keyCode == 0x35 {
+            if inCandidateMode { cancelCandidateMode(client: client); return true }
+            phrases = []; current = ""; client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0)); return true
+        }
         if chars == " " {
             if !current.isEmpty {
                 if phrases.count >= maxPhrases { phrases.removeFirst() }
@@ -149,6 +152,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
             return false
         }
         if keyCode == 0x24 {
+            if inCandidateMode { exitCandidateMode(client: client); return true }
             if !fullText.isEmpty { doConvert(client: client, mode: isShift ? .toEnglish : .toJapanese) }
             return true
         }
@@ -225,13 +229,20 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     private func exitCandidateMode(client: IMKTextInput) {
         if candidateIndex < candidateList.count {
             let chosen = candidateList[candidateIndex]
-            lastConvertedRomaji = candidateRomaji
-            lastConvertedResult = chosen
+            lastConvertedRomaji = candidateRomaji; lastConvertedResult = chosen
             conversionHistory.append(sanitizeForHistory(chosen))
             if conversionHistory.count > maxHistory { conversionHistory.removeFirst() }
             client.insertText(chosen, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
         }
         candidateList = []; candidateIndex = 0; inCandidateMode = false; candidateRomaji = ""
+        Task { @MainActor in self.getCandidatesWindow()?.hide() }
+    }
+
+    private func cancelCandidateMode(client: IMKTextInput) {
+        // Discard candidates, clear marked text
+        candidateList = []; candidateIndex = 0; inCandidateMode = false; candidateRomaji = ""
+        client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+        Task { @MainActor in self.getCandidatesWindow()?.hide() }
     }
 
     // ── Sanitize ──
