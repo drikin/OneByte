@@ -176,15 +176,32 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     @objc(inputText:client:)
     nonisolated override public func inputText(_ string: String!, client sender: Any!) -> Bool { return false }
 
-    // ── Candidate display (inline, single-line) ──
+    // ── Candidate window using IMKCandidates ──
+    private var candidatesWindow: IMKCandidates?
+
+    override init!(server: IMKServer!, delegate: Any!, client sender: Any!) {
+        super.init(server: server, delegate: delegate, client: sender)
+        candidatesWindow = IMKCandidates(server: server, panelType: kIMKSingleColumnScrollingCandidatePanel)
+        candidatesWindow?.setDelegate(self)
+    }
+
+    override func candidates(_ sender: Any!) -> [Any]! {
+        return candidates as [Any]
+    }
+
+    override func candidateSelected(_ candidateString: NSAttributedString!) {
+        // Handled via handleOnMain Enter key processing
+        candidatesWindow?.hide()
+    }
+
+    override func candidateSelectionChanged(_ candidateString: NSAttributedString!) {
+        if let idx = candidates.firstIndex(of: candidateString.string) { candidateIndex = idx }
+    }
+
     private func showCandidate(client: IMKTextInput) {
         guard candidateIndex < candidates.count else { return }
-        let labels = ["❶", "❷", "❸", "❹"]
-        let line = candidates.enumerated().map { i, c in
-            let marker = i == candidateIndex ? "▸" : " "
-            return "\(marker)\(i < labels.count ? labels[i] : "\(i+1)")\(c)"
-        }.joined(separator: " │ ")
-        client.setMarkedText(NSAttributedString(string: line), selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+        candidatesWindow?.update()
+        candidatesWindow?.show(kIMKLocateCandidatesAboveHint, horizontally: 0, vertically: 0)
         converting = false
     }
 
