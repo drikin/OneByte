@@ -5,9 +5,9 @@ import InputMethodKit
 @main
 final class OneByteApplication: NSApplication, NSApplicationDelegate {
     var server: IMKServer!
+    var candidatesWindow: IMKCandidates!
     var preferencesController: PreferencesController?
     var dictionaryController: DictionaryController?
-    var statusItem: NSStatusItem!
 
     override init() {
         super.init()
@@ -21,6 +21,10 @@ final class OneByteApplication: NSApplication, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let connName = Bundle.main.infoDictionary?["InputMethodConnectionName"] as? String
         server = IMKServer(name: connName, bundleIdentifier: Bundle.main.bundleIdentifier)
+        // Process-global candidate window (one per process, not per controller)
+        candidatesWindow = IMKCandidates(server: server, panelType: kIMKSingleColumnScrollingCandidatePanel)
+        // Route all key events to controller first, then let window handle remainder
+        candidatesWindow.setAttributes([IMKCandidatesSendServerKeyEventFirst: true])
         preferencesController = PreferencesController()
         dictionaryController = DictionaryController()
         NSLog("OneByte: server initialized")
