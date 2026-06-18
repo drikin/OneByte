@@ -150,7 +150,16 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
             phrases = []; current = ""; client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0)); return true
         }
         if chars == " " {
-            if inCandidateMode { exitCandidateMode(client: client); return true }
+            if inCandidateMode && !candidateList.isEmpty {
+                candidateIndex = (candidateIndex + 1) % candidateList.count
+                let chosen = candidateList[candidateIndex]
+                client.setMarkedText(
+                    NSAttributedString(string: chosen),
+                    selectionRange: NSRange(location: chosen.utf16.count, length: 0),
+                    replacementRange: NSRange(location: NSNotFound, length: 0)
+                )
+                return true
+            }
             if !current.isEmpty {
                 if phrases.count >= maxPhrases { phrases.removeFirst() }
                 phrases.append(current); current = ""; updateMarked(client: client); return true
