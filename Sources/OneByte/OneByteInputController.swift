@@ -186,11 +186,11 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         }
     }
 
-    override func candidates(_ sender: Any!) -> [Any]! {
+    override public func candidates(_ sender: Any!) -> [Any]! {
         return candidates as [Any]
     }
 
-    override func candidateSelected(_ candidateString: NSAttributedString!) {
+    override public func candidateSelected(_ candidateString: NSAttributedString!) {
         Task { @MainActor in self.candidatesWindow?.hide() }
     }
 
@@ -198,7 +198,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         guard candidateIndex < candidates.count else { return }
         Task { @MainActor in
             self.candidatesWindow?.update()
-            self.candidatesWindow?.show(.locateCandidatesAboveHint)
+            self.candidatesWindow?.show(kIMKLocateCandidatesAboveHint)
         }
         converting = false
     }
