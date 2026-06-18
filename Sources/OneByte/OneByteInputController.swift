@@ -25,7 +25,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     private var conversionSeq = 0
 
     // ── Candidates ──
-    private var candidates: [String] = []
+    private var candidateList: [String] = []
     private var candidateIndex = 0
     private var candidateRomaji = ""
     private var inCandidateMode = false
@@ -77,7 +77,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         conversionTask?.cancel(); conversionTask = nil
         phrases = []; current = ""; converting = false; conversionHistory = []
         lastConvertedRomaji = ""; lastConvertedResult = ""
-        candidates = []; candidateIndex = 0; inCandidateMode = false
+        candidateList = []; candidateIndex = 0; inCandidateMode = false; candidateRomaji = ""
         super.deactivateServer(sender)
     }
 
@@ -128,8 +128,8 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         guard let client = client else { return false }
 
         // Tab = cycle candidates (when in candidate mode)
-        if chars == "\t" && inCandidateMode && !candidates.isEmpty {
-            candidateIndex = (candidateIndex + 1) % candidates.count
+        if chars == "\t" && inCandidateMode && !candidateList.isEmpty {
+            candidateIndex = (candidateIndex + 1) % candidateList.count
             showCandidate(client: client)
             return true
         }
@@ -187,7 +187,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     }
 
     override public func candidates(_ sender: Any!) -> [Any]! {
-        return candidates as [Any]
+        return candidateList as [Any]
     }
 
     override public func candidateSelected(_ candidateString: NSAttributedString!) {
@@ -195,7 +195,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     }
 
     private func showCandidate(client: IMKTextInput) {
-        guard candidateIndex < candidates.count else { return }
+        guard candidateIndex < candidateList.count else { return }
         Task { @MainActor in
             self.candidatesWindow?.update()
             self.candidatesWindow?.show(kIMKLocateCandidatesAboveHint)
@@ -204,15 +204,15 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     }
 
     private func exitCandidateMode(client: IMKTextInput) {
-        if candidateIndex < candidates.count {
-            let chosen = candidates[candidateIndex]
+        if candidateIndex < candidateList.count {
+            let chosen = candidateList[candidateIndex]
             lastConvertedRomaji = candidateRomaji
             lastConvertedResult = chosen
             conversionHistory.append(sanitizeForHistory(chosen))
             if conversionHistory.count > maxHistory { conversionHistory.removeFirst() }
             client.insertText(chosen, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
         }
-        candidates = []; candidateIndex = 0; inCandidateMode = false; candidateRomaji = ""
+        candidateList = []; candidateIndex = 0; inCandidateMode = false; candidateRomaji = ""
     }
 
     // ── Sanitize ──
@@ -293,7 +293,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
                     return
                 }
                 // Show candidates
-                self.candidates = results
+                self.candidateList = results
                 self.candidateIndex = 0
                 self.candidateRomaji = text
                 self.inCandidateMode = true
