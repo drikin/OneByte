@@ -96,6 +96,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
     // ── IMKCandidates delegate methods ──
     override public func candidates(_ sender: Any!) -> [Any]! {
+        NSLog("OneByte candidates() called, count=\(candidateList.count): \(candidateList)")
         return candidateList as [Any]
     }
 
