@@ -127,10 +127,15 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     private func handleOnMain(chars: String, keyCode: UInt16, isShift: Bool, client: IMKTextInput?) -> Bool {
         guard let client = client else { return false }
 
-        // Tab = cycle candidates (when in candidate mode)
+        // Tab = cycle candidates (when in candidate mode) — also handled by IMKCandidates window
         if chars == "\t" && inCandidateMode && !candidateList.isEmpty {
             candidateIndex = (candidateIndex + 1) % candidateList.count
-            showCandidate(client: client)
+            let chosen = candidateList[candidateIndex]
+            client.setMarkedText(
+                NSAttributedString(string: chosen),
+                selectionRange: NSRange(location: chosen.utf16.count, length: 0),
+                replacementRange: NSRange(location: NSNotFound, length: 0)
+            )
             return true
         }
 
@@ -202,10 +207,11 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
             lastConvertedRomaji = candidateRomaji; lastConvertedResult = chosen
             conversionHistory.append(sanitizeForHistory(chosen))
             if conversionHistory.count > maxHistory { conversionHistory.removeFirst() }
+            client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
             client.insertText(chosen, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
         }
         candidateList = []; candidateIndex = 0; inCandidateMode = false; candidateRomaji = ""
-        Task { @MainActor in self.getCandidatesWindow()?.hide() }
+        DispatchQueue.main.async { self.getCandidatesWindow()?.hide() }
     }
 
     private func showCandidate(client: IMKTextInput) {
@@ -227,22 +233,21 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     }
 
     private func exitCandidateMode(client: IMKTextInput) {
-        if candidateIndex < candidateList.count {
-            let chosen = candidateList[candidateIndex]
-            lastConvertedRomaji = candidateRomaji; lastConvertedResult = chosen
-            conversionHistory.append(sanitizeForHistory(chosen))
-            if conversionHistory.count > maxHistory { conversionHistory.removeFirst() }
-            client.insertText(chosen, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
-        }
+        let chosen = candidateIndex < candidateList.count ? candidateList[candidateIndex] : ""
         candidateList = []; candidateIndex = 0; inCandidateMode = false; candidateRomaji = ""
-        Task { @MainActor in self.getCandidatesWindow()?.hide() }
+        DispatchQueue.main.async { self.getCandidatesWindow()?.hide() }
+        guard !chosen.isEmpty else { return }
+        lastConvertedRomaji = candidateRomaji; lastConvertedResult = chosen
+        conversionHistory.append(sanitizeForHistory(chosen))
+        if conversionHistory.count > maxHistory { conversionHistory.removeFirst() }
+        client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+        client.insertText(chosen, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
     }
 
     private func cancelCandidateMode(client: IMKTextInput) {
-        // Discard candidates, clear marked text
         candidateList = []; candidateIndex = 0; inCandidateMode = false; candidateRomaji = ""
         client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
-        Task { @MainActor in self.getCandidatesWindow()?.hide() }
+        DispatchQueue.main.async { self.getCandidatesWindow()?.hide() }
     }
 
     // ── Sanitize ──
