@@ -177,13 +177,12 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     nonisolated override public func inputText(_ string: String!, client sender: Any!) -> Bool { return false }
 
     // ── Candidate window using IMKCandidates ──
-    private var candidatesWindow: IMKCandidates?
-
-    override init!(server: IMKServer!, delegate: Any!, client sender: Any!) {
-        super.init(server: server, delegate: delegate, client: sender)
-        Task { @MainActor in
-            self.candidatesWindow = IMKCandidates(server: server, panelType: kIMKSingleColumnScrollingCandidatePanel)
+    private var _candidatesWindow: IMKCandidates?
+    private func getCandidatesWindow() -> IMKCandidates? {
+        if _candidatesWindow == nil, let server = server() {
+            _candidatesWindow = IMKCandidates(server: server, panelType: kIMKSingleColumnScrollingCandidatePanel)
         }
+        return _candidatesWindow
     }
 
     override public func candidates(_ sender: Any!) -> [Any]! {
@@ -191,14 +190,14 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     }
 
     override public func candidateSelected(_ candidateString: NSAttributedString!) {
-        Task { @MainActor in self.candidatesWindow?.hide() }
+        Task { @MainActor in self.getCandidatesWindow()?.hide() }
     }
 
     private func showCandidate(client: IMKTextInput) {
         guard candidateIndex < candidateList.count else { return }
         Task { @MainActor in
-            self.candidatesWindow?.update()
-            self.candidatesWindow?.show(kIMKLocateCandidatesAboveHint)
+            self.getCandidatesWindow()?.update()
+            self.getCandidatesWindow()?.show(kIMKLocateCandidatesAboveHint)
         }
         converting = false
     }
