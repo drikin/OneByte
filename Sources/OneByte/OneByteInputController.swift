@@ -96,7 +96,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
     // ── IMKCandidates delegate methods ──
     override public func candidates(_ sender: Any!) -> [Any]! {
-        NSLog("OneByte candidates() called, count=\(candidateList.count): \(candidateList)")
+        NSLog("OneByte candidates() count=\(candidateList.count) items=\(candidateList.joined(separator: "|"))")
         return candidateList as [Any]
     }
 
@@ -278,6 +278,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
     private func showCandidates(client: IMKTextInput) {
         guard !candidateList.isEmpty else { return }
+        NSLog("OneByte showCandidates count=\(candidateList.count): \(candidateList)")
         currentClient = client as AnyObject
         // Show first candidate as inline marked text
         let first = candidateList[0]
