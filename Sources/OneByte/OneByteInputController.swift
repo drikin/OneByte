@@ -176,11 +176,15 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     @objc(inputText:client:)
     nonisolated override public func inputText(_ string: String!, client sender: Any!) -> Bool { return false }
 
-    // ── Candidate display ──
+    // ── Candidate display (inline, single-line) ──
     private func showCandidate(client: IMKTextInput) {
         guard candidateIndex < candidates.count else { return }
-        let all = candidates.enumerated().map { i, c in i == candidateIndex ? "▸ \(c) ◂" : "  \(c)" }.joined(separator: "\n")
-        client.setMarkedText(NSAttributedString(string: all), selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+        let labels = ["❶", "❷", "❸", "❹"]
+        let line = candidates.enumerated().map { i, c in
+            let marker = i == candidateIndex ? "▸" : " "
+            return "\(marker)\(i < labels.count ? labels[i] : "\(i+1)")\(c)"
+        }.joined(separator: " │ ")
+        client.setMarkedText(NSAttributedString(string: line), selectionRange: NSRange(location: 0, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
         converting = false
     }
 
