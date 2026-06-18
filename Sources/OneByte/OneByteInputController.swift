@@ -178,6 +178,8 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
     // ── Candidate window using IMKCandidates ──
     private var _candidatesWindow: IMKCandidates?
+    private weak var candidateClient: AnyObject?
+
     private func getCandidatesWindow() -> IMKCandidates? {
         if _candidatesWindow == nil, let server = server() {
             _candidatesWindow = IMKCandidates(server: server, panelType: kIMKSingleColumnScrollingCandidatePanel)
@@ -190,11 +192,29 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     }
 
     override public func candidateSelected(_ candidateString: NSAttributedString!) {
+        let chosen = candidateString.string
+        guard !chosen.isEmpty else { return }
+        if let client = candidateClient as? IMKTextInput {
+            lastConvertedRomaji = candidateRomaji; lastConvertedResult = chosen
+            conversionHistory.append(sanitizeForHistory(chosen))
+            if conversionHistory.count > maxHistory { conversionHistory.removeFirst() }
+            client.insertText(chosen, replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
+        }
+        candidateList = []; candidateIndex = 0; inCandidateMode = false; candidateRomaji = ""
         Task { @MainActor in self.getCandidatesWindow()?.hide() }
     }
 
     private func showCandidate(client: IMKTextInput) {
-        guard candidateIndex < candidateList.count else { return }
+        guard !candidateList.isEmpty else { return }
+        candidateClient = client as AnyObject
+        // Show first candidate as marked text (inline preview)
+        let first = candidateList[candidateIndex]
+        client.setMarkedText(
+            NSAttributedString(string: first),
+            selectionRange: NSRange(location: first.utf16.count, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        // Open candidate window for alternatives
         Task { @MainActor in
             self.getCandidatesWindow()?.update()
             self.getCandidatesWindow()?.show(kIMKLocateCandidatesAboveHint)
@@ -313,7 +333,9 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         let body: [String: Any] = ["model": modelName, "messages": [["role": "system", "content": prompt], ["role": "user", "content": romaji]], "max_tokens": 120, "temperature": 0.3]
         let raw = await callLLM(body: body, fallback: romaji)
         // Parse pipe-separated alternatives
-        let alts = raw.components(separatedBy: "|").map { $0.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "\"'")) }.filter { !$0.isEmpty }
+        let alts = raw.components(separatedBy: "|")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "\"'「」")) }
+            .filter { !$0.isEmpty && $0 != candidateRomaji }
         if alts.count >= 2 { return Array(alts.prefix(4)) }
         return [raw]
     }
