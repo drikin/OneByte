@@ -429,6 +429,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
 
         let body: [String: Any] = ["model": modelName, "messages": [["role": "system", "content": prompt], ["role": "user", "content": romaji]], "max_tokens": 400, "temperature": 0.3]
         let raw = await callLLM(body: body, fallback: romaji)
+        NSLog("OneByte LLM raw response: \(raw.prefix(200))")
         let alts = raw.components(separatedBy: "|")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "\"'「」")) }
             .filter { !$0.isEmpty && $0 != romaji }
