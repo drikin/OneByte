@@ -23,8 +23,8 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
     // ── Input buffer ──
     private var phrases: [String] = []
     private var current: String = ""
-    private let maxPhrases = 20
-    private let maxCurrentLen = 200
+    private let maxPhrases = 200
+    private let maxCurrentLen = 10000
     private var converting = false
     private var conversionTask: Task<Void, Never>?
     private var directMode = false
@@ -427,7 +427,7 @@ nonisolated public final class OneByteInputController: IMKInputController, @unch
         if !appName.isEmpty { prompt += " Active application: \(appName)." }
         if !context.isEmpty { prompt += "\n\nPrevious conversions:\n\(context)" }
 
-        let body: [String: Any] = ["model": modelName, "messages": [["role": "system", "content": prompt], ["role": "user", "content": romaji]], "max_tokens": 120, "temperature": 0.3]
+        let body: [String: Any] = ["model": modelName, "messages": [["role": "system", "content": prompt], ["role": "user", "content": romaji]], "max_tokens": 400, "temperature": 0.3]
         let raw = await callLLM(body: body, fallback: romaji)
         let alts = raw.components(separatedBy: "|")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "\"'「」")) }
